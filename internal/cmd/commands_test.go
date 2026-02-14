@@ -1330,16 +1330,16 @@ func TestAutoConnect(t *testing.T) {
 		}
 	})
 
-	t.Run("TLS without config falls back to standard", func(t *testing.T) {
-		cmds, mock := newMockCmds()
+	t.Run("TLS without config returns error", func(t *testing.T) {
+		cmds, _ := newMockCmds()
 		conn := types.Connection{Host: "localhost", Port: 6379, UseTLS: true}
 		msg := cmds.AutoConnect(conn)()
 		result := msg.(types.ConnectedMsg)
-		if result.Err != nil {
-			t.Errorf("unexpected error: %v", result.Err)
+		if result.Err == nil {
+			t.Error("expected error for TLS without config")
 		}
-		if len(mock.Calls) == 0 || mock.Calls[0] != "Connect" {
-			t.Errorf("expected Connect (fallback) call, got %v", mock.Calls)
+		if result.Err.Error() != "TLS requested but TLS configuration is missing" {
+			t.Errorf("unexpected error message: %v", result.Err)
 		}
 	})
 

@@ -94,7 +94,10 @@ func AutoConnectCmd(conn types.Connection) tea.Cmd {
 		var err error
 		if conn.UseCluster {
 			err = RedisClient.ConnectCluster([]string{fmt.Sprintf("%s:%d", conn.Host, conn.Port)}, conn.Password)
-		} else if conn.UseTLS && conn.TLSConfig != nil {
+		} else if conn.UseTLS {
+			if conn.TLSConfig == nil {
+				return types.ConnectedMsg{Err: fmt.Errorf("TLS requested but TLS configuration is missing")}
+			}
 			tlsCfg, tlsErr := conn.TLSConfig.BuildTLSConfig()
 			if tlsErr != nil {
 				slog.Error("Failed to build TLS config", "error", tlsErr)

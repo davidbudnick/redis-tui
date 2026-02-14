@@ -16,6 +16,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+var version = "dev"
+
 func main() {
 	opts := parseCLIFlags()
 
@@ -54,9 +56,15 @@ func main() {
 }
 
 func parseCLIFlags() *types.Connection {
-	conn, showVersion := parseFlags(os.Args[1:])
+	conn, showVersion, err := parseFlags(os.Args[1:])
+	if err != nil {
+		if err == flag.ErrHelp {
+			os.Exit(0)
+		}
+		os.Exit(2)
+	}
 	if showVersion {
-		fmt.Println("redis-tui version dev")
+		fmt.Printf("redis-tui version %s\n", version)
 		os.Exit(0)
 	}
 	return conn
@@ -64,11 +72,11 @@ func parseCLIFlags() *types.Connection {
 
 // parseFlags parses the given args into a Connection. Returns nil when no
 // --host is provided (interactive mode). showVersion is true when --version
-// was requested.
-func parseFlags(args []string) (conn *types.Connection, showVersion bool) {
+// was requested. Returns an error if flag parsing fails.
+func parseFlags(args []string) (conn *types.Connection, showVersion bool, err error) {
 	fs := flag.NewFlagSet("redis-tui", flag.ContinueOnError)
 
-	host := fs.String("host", "", "Redis server hostname (default: localhost)")
+	host := fs.String("host", "", "Redis server hostname (required for quick-connect mode)")
 	port := fs.Int("port", 6379, "Redis server port")
 	password := fs.String("password", "", "Redis password")
 	dbNum := fs.Int("db", 0, "Redis database number (0-15)")
@@ -91,7 +99,7 @@ func parseFlags(args []string) (conn *types.Connection, showVersion bool) {
 		fmt.Fprintf(os.Stderr, "Usage: redis-tui [flags]\n\n")
 		fmt.Fprintf(os.Stderr, "A terminal UI for Redis.\n\n")
 		fmt.Fprintf(os.Stderr, "Flags:\n")
-		fmt.Fprintf(os.Stderr, "  -h, --host string       Redis server hostname (default \"localhost\")\n")
+		fmt.Fprintf(os.Stderr, "  -h, --host string       Redis server hostname (required for quick-connect)\n")
 		fmt.Fprintf(os.Stderr, "  -p, --port int          Redis server port (default 6379)\n")
 		fmt.Fprintf(os.Stderr, "  -a, --password string   Redis password\n")
 		fmt.Fprintf(os.Stderr, "  -n, --db int            Redis database number, 0-15 (default 0)\n")
@@ -106,16 +114,16 @@ func parseFlags(args []string) (conn *types.Connection, showVersion bool) {
 	}
 
 	if err := fs.Parse(args); err != nil {
-		return nil, false
+		return nil, false, err
 	}
 
 	if *version {
-		return nil, true
+		return nil, true, nil
 	}
 
 	// If no host flag provided, return nil (normal interactive mode)
 	if *host == "" {
-		return nil, false
+		return nil, false, nil
 	}
 
 	conn = &types.Connection{
@@ -142,7 +150,7 @@ func parseFlags(args []string) (conn *types.Connection, showVersion bool) {
 		}
 	}
 
-	return conn, false
+	return conn, false, nil
 }
 
 func initConfig() (*db.Config, error) {

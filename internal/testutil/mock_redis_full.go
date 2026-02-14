@@ -95,6 +95,11 @@ func NewFullMockRedisClient() *FullMockRedisClient {
 
 // Connection management
 
+func (m *FullMockRedisClient) Connect(host string, port int, password string, db int) error {
+	m.Calls = append(m.Calls, "Connect")
+	return m.MockRedisClient.Connect(host, port, password, db)
+}
+
 func (m *FullMockRedisClient) ConnectWithTLS(_ string, _ int, _ string, _ int, _ *tls.Config) error {
 	m.Calls = append(m.Calls, "ConnectWithTLS")
 	if m.ConnectWithTLSError != nil {

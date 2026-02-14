@@ -49,7 +49,7 @@ type TLSConfig struct {
 // BuildTLSConfig creates a *tls.Config from the stored TLS parameters.
 func (t *TLSConfig) BuildTLSConfig() (*tls.Config, error) {
 	cfg := &tls.Config{
-		InsecureSkipVerify: t.InsecureSkipVerify, //#nosec G402 -- user-configured
+		InsecureSkipVerify: t.InsecureSkipVerify, // #nosec G402 -- user-configured
 		ServerName:         t.ServerName,
 	}
 
