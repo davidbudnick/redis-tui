@@ -109,6 +109,31 @@ func (c *Commands) Connect(host string, port int, password string, dbNum int, us
 	}
 }
 
+func (c *Commands) AutoConnect(conn types.Connection) tea.Cmd {
+	return func() tea.Msg {
+		if c.redis == nil {
+			return types.ConnectedMsg{Err: nil}
+		}
+		var err error
+		if conn.UseCluster {
+			err = c.redis.ConnectCluster([]string{fmt.Sprintf("%s:%d", conn.Host, conn.Port)}, conn.Password)
+		} else if conn.UseTLS && conn.TLSConfig != nil {
+			tlsCfg, tlsErr := conn.TLSConfig.BuildTLSConfig()
+			if tlsErr != nil {
+				slog.Error("Failed to build TLS config", "error", tlsErr)
+				return types.ConnectedMsg{Err: tlsErr}
+			}
+			err = c.redis.ConnectWithTLS(conn.Host, conn.Port, conn.Password, conn.DB, tlsCfg)
+		} else {
+			err = c.redis.Connect(conn.Host, conn.Port, conn.Password, conn.DB)
+		}
+		if err != nil {
+			slog.Error("Failed to connect", "error", err)
+		}
+		return types.ConnectedMsg{Err: err}
+	}
+}
+
 func (c *Commands) Disconnect() tea.Cmd {
 	return func() tea.Msg {
 		if c.redis != nil {

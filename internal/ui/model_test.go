@@ -259,6 +259,70 @@ func TestModel_ResetPubSubInputs(t *testing.T) {
 	}
 }
 
+func TestModel_CLIConnection_Nil(t *testing.T) {
+	m := NewModel()
+	if m.CLIConnection != nil {
+		t.Error("CLIConnection should be nil by default")
+	}
+}
+
+func TestModel_HandleAutoConnectMsg(t *testing.T) {
+	m := NewModel()
+	conn := types.Connection{
+		Name: "test",
+		Host: "redis.example.com",
+		Port: 6380,
+		DB:   2,
+	}
+	msg := types.AutoConnectMsg{Connection: conn}
+
+	result, _ := m.handleAutoConnectMsg(msg)
+	model := result.(Model)
+
+	if model.CurrentConn == nil {
+		t.Fatal("CurrentConn should be set")
+	}
+	if model.CurrentConn.Host != "redis.example.com" {
+		t.Errorf("Host = %q, want %q", model.CurrentConn.Host, "redis.example.com")
+	}
+	if model.CurrentConn.Port != 6380 {
+		t.Errorf("Port = %d, want %d", model.CurrentConn.Port, 6380)
+	}
+	if model.CurrentConn.DB != 2 {
+		t.Errorf("DB = %d, want %d", model.CurrentConn.DB, 2)
+	}
+	if !model.Loading {
+		t.Error("Loading should be true")
+	}
+	if model.StatusMsg != "Connecting..." {
+		t.Errorf("StatusMsg = %q, want %q", model.StatusMsg, "Connecting...")
+	}
+	if model.CLIConnection != nil {
+		t.Error("CLIConnection should be nil after handling (consumed)")
+	}
+}
+
+func TestModel_HandleAutoConnectMsg_Cluster(t *testing.T) {
+	m := NewModel()
+	conn := types.Connection{
+		Name:       "cluster",
+		Host:       "redis.example.com",
+		Port:       7000,
+		UseCluster: true,
+	}
+	msg := types.AutoConnectMsg{Connection: conn}
+
+	result, _ := m.handleAutoConnectMsg(msg)
+	model := result.(Model)
+
+	if model.CurrentConn == nil {
+		t.Fatal("CurrentConn should be set")
+	}
+	if !model.CurrentConn.UseCluster {
+		t.Error("UseCluster should be true")
+	}
+}
+
 // Note: Tests for unexported functions like createConnInputs, createAddKeyInputs,
 // createAddCollectionInputs, and createPubSubInputs are covered indirectly
 // through TestNewModel which verifies the inputs are correctly initialized.

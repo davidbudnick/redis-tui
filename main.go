@@ -54,26 +54,40 @@ func main() {
 }
 
 func parseCLIFlags() *types.Connection {
-	host := flag.String("host", "", "Redis server hostname (default: localhost)")
-	port := flag.Int("port", 6379, "Redis server port")
-	password := flag.String("password", "", "Redis password")
-	dbNum := flag.Int("db", 0, "Redis database number (0-15)")
-	name := flag.String("name", "", "Connection display name")
-	cluster := flag.Bool("cluster", false, "Enable cluster mode")
-	tls := flag.Bool("tls", false, "Enable TLS/SSL")
-	tlsCert := flag.String("tls-cert", "", "TLS client certificate file")
-	tlsKey := flag.String("tls-key", "", "TLS client private key file")
-	tlsCA := flag.String("tls-ca", "", "TLS CA certificate file")
-	tlsSkipVerify := flag.Bool("tls-skip-verify", false, "Skip TLS certificate verification")
-	version := flag.Bool("version", false, "Print version and exit")
+	conn, showVersion := parseFlags(os.Args[1:])
+	if showVersion {
+		fmt.Println("redis-tui version dev")
+		os.Exit(0)
+	}
+	return conn
+}
+
+// parseFlags parses the given args into a Connection. Returns nil when no
+// --host is provided (interactive mode). showVersion is true when --version
+// was requested.
+func parseFlags(args []string) (conn *types.Connection, showVersion bool) {
+	fs := flag.NewFlagSet("redis-tui", flag.ContinueOnError)
+
+	host := fs.String("host", "", "Redis server hostname (default: localhost)")
+	port := fs.Int("port", 6379, "Redis server port")
+	password := fs.String("password", "", "Redis password")
+	dbNum := fs.Int("db", 0, "Redis database number (0-15)")
+	name := fs.String("name", "", "Connection display name")
+	cluster := fs.Bool("cluster", false, "Enable cluster mode")
+	tls := fs.Bool("tls", false, "Enable TLS/SSL")
+	tlsCert := fs.String("tls-cert", "", "TLS client certificate file")
+	tlsKey := fs.String("tls-key", "", "TLS client private key file")
+	tlsCA := fs.String("tls-ca", "", "TLS CA certificate file")
+	tlsSkipVerify := fs.Bool("tls-skip-verify", false, "Skip TLS certificate verification")
+	version := fs.Bool("version", false, "Print version and exit")
 
 	// Short aliases
-	flag.StringVar(host, "h", "", "Redis server hostname (shorthand)")
-	flag.IntVar(port, "p", 6379, "Redis server port (shorthand)")
-	flag.StringVar(password, "a", "", "Redis password (shorthand)")
-	flag.IntVar(dbNum, "n", 0, "Redis database number (shorthand)")
+	fs.StringVar(host, "h", "", "Redis server hostname (shorthand)")
+	fs.IntVar(port, "p", 6379, "Redis server port (shorthand)")
+	fs.StringVar(password, "a", "", "Redis password (shorthand)")
+	fs.IntVar(dbNum, "n", 0, "Redis database number (shorthand)")
 
-	flag.Usage = func() {
+	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: redis-tui [flags]\n\n")
 		fmt.Fprintf(os.Stderr, "A terminal UI for Redis.\n\n")
 		fmt.Fprintf(os.Stderr, "Flags:\n")
@@ -91,19 +105,20 @@ func parseCLIFlags() *types.Connection {
 		fmt.Fprintf(os.Stderr, "      --version           Print version and exit\n")
 	}
 
-	flag.Parse()
+	if err := fs.Parse(args); err != nil {
+		return nil, false
+	}
 
 	if *version {
-		fmt.Println("redis-tui version dev")
-		os.Exit(0)
+		return nil, true
 	}
 
 	// If no host flag provided, return nil (normal interactive mode)
 	if *host == "" {
-		return nil
+		return nil, false
 	}
 
-	conn := &types.Connection{
+	conn = &types.Connection{
 		Host:       *host,
 		Port:       *port,
 		Password:   *password,
@@ -127,7 +142,7 @@ func parseCLIFlags() *types.Connection {
 		}
 	}
 
-	return conn
+	return conn, false
 }
 
 func initConfig() (*db.Config, error) {
