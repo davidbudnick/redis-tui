@@ -159,10 +159,22 @@ func initConfig() (*db.Config, error) {
 		homeDir = os.TempDir()
 	}
 
-	configDir := filepath.Join(homeDir, ".redis")
+	configDir := filepath.Join(homeDir, ".config", "redis-tui")
 	if err := os.MkdirAll(configDir, 0750); err != nil {
 		return nil, err
 	}
 
-	return db.NewConfig(filepath.Join(configDir, "config.json"))
+	configPath := filepath.Join(configDir, "config.json")
+
+	// Migrate from legacy config path (~/.redis/config.json) if new config doesn't exist
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		legacyPath := filepath.Join(homeDir, ".redis", "config.json")
+		if legacyData, err := os.ReadFile(legacyPath); err == nil {
+			if writeErr := os.WriteFile(configPath, legacyData, 0600); writeErr == nil {
+				slog.Info("Migrated config from legacy path", "from", legacyPath, "to", configPath)
+			}
+		}
+	}
+
+	return db.NewConfig(configPath)
 }

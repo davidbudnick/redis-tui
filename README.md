@@ -50,7 +50,7 @@ go install github.com/davidbudnick/redis-tui@latest
 - **SSH tunneling** for secure remote access
 - **Connection groups** to organize instances
 - **Database switching** between Redis databases (0-15)
-- **Cluster support** — connect to any cluster node and press `C` to view all nodes, their roles (master/replica), slot ranges, and link state; cluster metrics in the live dashboard
+- **Cluster support** — connect to any cluster node and press `K` to view all nodes, their roles (master/replica), slot ranges, and link state; cluster metrics in the live dashboard
 
 ### Monitoring and Operations
 - **Live metrics dashboard** — real-time ops/sec, memory, CPU, network I/O, hit rate, and client count with scrolling ASCII charts; cluster node count display
@@ -64,6 +64,7 @@ go install github.com/davidbudnick/redis-tui@latest
 - **Bulk operations** — pattern-based delete and batch TTL across multiple keys
 - **Pub/Sub** — publish messages to channels and view active channels
 - **Lua scripting** — execute Lua scripts directly against the server
+- **Themes** — switch between color themes
 
 ## Installation
 
@@ -200,8 +201,8 @@ rm -f $(go env GOPATH)/bin/redis-tui
 | `i` | Server info | `Ctrl+X` | View expiring keys |
 | `D` | Switch database | `m` | Live metrics dashboard |
 | `f` | Flush database | `M` | Memory stats |
-| `p` | Pub/Sub publish | `C` | Cluster info |
-| `L` | View slow log | `K` | Compare keys |
+| `p` | Pub/Sub publish | `K` | Cluster info |
+| `L` | View slow log | `=` | Compare keys |
 | `E` | Execute Lua script | `P` | Key templates |
 
 ### Key Detail Screen
@@ -262,6 +263,13 @@ Configuration is stored in `~/.config/redis-tui/config.json`.
       "updated_at": "2025-01-01T00:00:00Z"
     }
   ],
+  "groups": [
+    {
+      "name": "local",
+      "color": "#50fa7b",
+      "connections": [1, 2]
+    }
+  ],
   "favorites": [
     {
       "connection_id": 1,
@@ -318,6 +326,14 @@ Configuration is stored in `~/.config/redis-tui/config.json`.
       "description": "Sorted leaderboard",
       "key_pattern": "leaderboard:{game}",
       "type": "zset"
+    }
+  ],
+  "value_history": [
+    {
+      "key": "app:config",
+      "value": "old-value",
+      "timestamp": "2025-01-18T09:00:00Z",
+      "action": "edit"
     }
   ],
   "key_bindings": {
@@ -420,8 +436,14 @@ Keybindings can be customized in the configuration file under the `key_bindings`
 # Install development dependencies
 make dev-deps
 
+# Run the application
+make run
+
 # Run tests
 make test
+
+# Run tests with coverage
+make test-cover
 
 # Run linter
 make lint
@@ -429,8 +451,20 @@ make lint
 # Format code
 make fmt
 
+# Build the application
+make build
+
 # Build for all platforms
 make build-all
+
+# Clean build artifacts
+make clean
+
+# Create a release with goreleaser
+make release
+
+# Create a snapshot release (no publish)
+make snapshot
 ```
 
 ## License
