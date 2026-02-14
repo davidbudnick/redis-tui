@@ -247,17 +247,179 @@ Configuration is stored in `~/.config/redis-tui/config.json`.
       "name": "Local Redis",
       "host": "localhost",
       "port": 6379,
-      "password": "",
       "db": 0,
-      "use_tls": false
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    },
+    {
+      "id": 2,
+      "name": "Production (SSH)",
+      "host": "10.0.0.5",
+      "port": 6379,
+      "db": 0,
+      "group": "production",
+      "color": "#ff5555",
+      "use_ssh": true,
+      "ssh_config": {
+        "host": "bastion.example.com",
+        "port": 22,
+        "user": "deploy",
+        "private_key_path": "~/.ssh/id_ed25519"
+      },
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    },
+    {
+      "id": 3,
+      "name": "Staging (TLS)",
+      "host": "staging-redis.example.com",
+      "port": 6380,
+      "db": 0,
+      "group": "staging",
+      "use_tls": true,
+      "tls_config": {
+        "cert_file": "/etc/redis/tls/client.crt",
+        "key_file": "/etc/redis/tls/client.key",
+        "ca_file": "/etc/redis/tls/ca.crt",
+        "server_name": "staging-redis.example.com"
+      },
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    },
+    {
+      "id": 4,
+      "name": "Cluster Node",
+      "host": "cluster-1.example.com",
+      "port": 6379,
+      "db": 0,
+      "use_cluster": true,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
     }
   ],
+  "groups": [
+    {
+      "name": "production",
+      "color": "#ff5555",
+      "connections": [2]
+    },
+    {
+      "name": "staging",
+      "color": "#f1fa8c",
+      "connections": [3]
+    }
+  ],
+  "favorites": [
+    {
+      "connection_id": 1,
+      "connection": "Local Redis",
+      "key": "app:config",
+      "label": "App Settings",
+      "added_at": "2025-01-15T10:30:00Z"
+    }
+  ],
+  "recent_keys": [
+    {
+      "connection_id": 1,
+      "key": "session:abc123",
+      "type": "hash",
+      "accessed_at": "2025-01-20T14:00:00Z"
+    }
+  ],
+  "templates": [
+    {
+      "name": "Session",
+      "description": "User session data",
+      "key_pattern": "session:{user_id}",
+      "type": "hash",
+      "default_ttl": 86400000000000,
+      "fields": {
+        "token": "",
+        "created_at": "",
+        "user_agent": ""
+      }
+    },
+    {
+      "name": "Cache",
+      "description": "Cached data with TTL",
+      "key_pattern": "cache:{resource}:{id}",
+      "type": "string",
+      "default_ttl": 3600000000000
+    },
+    {
+      "name": "Rate Limit",
+      "description": "Rate limiting counter",
+      "key_pattern": "ratelimit:{ip}:{endpoint}",
+      "type": "string",
+      "default_ttl": 60000000000,
+      "default_value": "0"
+    },
+    {
+      "name": "Queue",
+      "description": "Job queue",
+      "key_pattern": "queue:{name}",
+      "type": "list"
+    },
+    {
+      "name": "Leaderboard",
+      "description": "Sorted leaderboard",
+      "key_pattern": "leaderboard:{game}",
+      "type": "zset"
+    }
+  ],
+  "key_bindings": {
+    "up": "k",
+    "down": "j",
+    "left": "h",
+    "right": "l",
+    "page_up": "ctrl+u",
+    "page_down": "ctrl+d",
+    "top": "g",
+    "bottom": "G",
+    "select": "enter",
+    "back": "esc",
+    "quit": "q",
+    "help": "?",
+    "refresh": "r",
+    "delete": "d",
+    "add": "a",
+    "edit": "e",
+    "copy": "c",
+    "rename": "R",
+    "search": "/",
+    "filter": "f",
+    "favorite": "F",
+    "watch": "w",
+    "export": "E",
+    "import": "I",
+    "server_info": "i",
+    "slow_log": "L",
+    "lua_script": "X",
+    "pubsub": "p",
+    "switch_db": "D",
+    "ttl": "t",
+    "bulk_delete": "B",
+    "tree_view": "T",
+    "memory_stats": "M",
+    "client_list": "C",
+    "cluster_info": "K",
+    "compare_keys": "=",
+    "json_path": "J",
+    "copy_clipboard": "y",
+    "logs": "O",
+    "themes": "ctrl+t",
+    "recent_keys": "H",
+    "favorites": "ctrl+f",
+    "value_history": "u"
+  },
   "tree_separator": ":",
   "max_recent_keys": 20,
   "max_value_history": 50,
   "watch_interval_ms": 1000
 }
 ```
+
+> **Note:** Passwords and SSH passphrases are never saved to the config file. They are stripped before serialization for security. The config file is written with `0600` permissions (owner read/write only).
 
 ### Connection Options
 
@@ -266,16 +428,26 @@ Configuration is stored in `~/.config/redis-tui/config.json`.
 | `name` | Display name for the connection |
 | `host` | Redis server hostname or IP |
 | `port` | Redis server port (default: 6379) |
-| `password` | Redis password (optional) |
+| `password` | Redis password (never saved to disk) |
 | `db` | Redis database number (0-15) |
+| `group` | Connection group name (optional) |
+| `color` | Display color for the connection (optional) |
 | `use_tls` | Enable TLS/SSL connection |
-| `ssh_host` | SSH tunnel hostname (optional) |
-| `ssh_user` | SSH tunnel username (optional) |
-| `ssh_key_path` | Path to SSH private key (optional) |
+| `tls_config.cert_file` | Client certificate file path |
+| `tls_config.key_file` | Client key file path |
+| `tls_config.ca_file` | CA certificate file path |
+| `tls_config.insecure_skip_verify` | Skip TLS certificate verification |
+| `tls_config.server_name` | TLS server name for verification |
+| `use_ssh` | Enable SSH tunneling |
+| `ssh_config.host` | SSH server hostname |
+| `ssh_config.port` | SSH server port |
+| `ssh_config.user` | SSH username |
+| `ssh_config.private_key_path` | Path to SSH private key file |
+| `use_cluster` | Enable Redis cluster mode |
 
 ### Custom Keybindings
 
-Keybindings can be customized in the configuration file under the `key_bindings` section. All navigation and action keys can be remapped to your preference.
+Keybindings can be customized in the configuration file under the `key_bindings` section. All navigation and action keys can be remapped to your preference. See the full example above for the complete list of customizable bindings and their default values.
 
 ## Requirements
 
