@@ -28,6 +28,11 @@ type ConnectedMsg struct {
 	Err error
 }
 
+// AutoConnectMsg triggers an automatic connection from CLI flags.
+type AutoConnectMsg struct {
+	Connection Connection
+}
+
 type DisconnectedMsg struct{}
 
 type KeysLoadedMsg struct {

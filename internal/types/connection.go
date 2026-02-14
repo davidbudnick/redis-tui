@@ -1,6 +1,12 @@
 package types
 
-import "time"
+import (
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+	"os"
+	"time"
+)
 
 // Connection stores Redis connection details
 type Connection struct {
@@ -38,6 +44,36 @@ type TLSConfig struct {
 	CAFile             string `json:"ca_file,omitempty"`
 	InsecureSkipVerify bool   `json:"insecure_skip_verify,omitempty"`
 	ServerName         string `json:"server_name,omitempty"`
+}
+
+// BuildTLSConfig creates a *tls.Config from the stored TLS parameters.
+func (t *TLSConfig) BuildTLSConfig() (*tls.Config, error) {
+	cfg := &tls.Config{
+		InsecureSkipVerify: t.InsecureSkipVerify, //#nosec G402 -- user-configured
+		ServerName:         t.ServerName,
+	}
+
+	if t.CertFile != "" && t.KeyFile != "" {
+		cert, err := tls.LoadX509KeyPair(t.CertFile, t.KeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load TLS key pair: %w", err)
+		}
+		cfg.Certificates = []tls.Certificate{cert}
+	}
+
+	if t.CAFile != "" {
+		caCert, err := os.ReadFile(t.CAFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read CA file: %w", err)
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(caCert) {
+			return nil, fmt.Errorf("failed to parse CA certificate")
+		}
+		cfg.RootCAs = pool
+	}
+
+	return cfg, nil
 }
 
 // ConnectionGroup organizes connections

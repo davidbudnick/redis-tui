@@ -169,6 +169,9 @@ type Model struct {
 	// Connection error (for prominent display)
 	ConnectionError string
 
+	// CLI auto-connect (set when --host flag is provided)
+	CLIConnection *types.Connection
+
 	// Lazy initialization flag
 	inputsInitialized bool
 }
@@ -301,10 +304,17 @@ func createPubSubInputs() []textinput.Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(
+	cmds := []tea.Cmd{
 		cmd.LoadConnectionsCmd(),
 		func() tea.Msg { return tea.EnableBracketedPaste() },
-	)
+	}
+	if m.CLIConnection != nil {
+		conn := *m.CLIConnection
+		cmds = append(cmds, func() tea.Msg {
+			return types.AutoConnectMsg{Connection: conn}
+		})
+	}
+	return tea.Batch(cmds...)
 }
 
 func (m Model) getPort() int {

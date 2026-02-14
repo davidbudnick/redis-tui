@@ -37,6 +37,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleConnectionUpdatedMsg(msg)
 	case types.ConnectionDeletedMsg:
 		return m.handleConnectionDeletedMsg(msg)
+	case types.AutoConnectMsg:
+		return m.handleAutoConnectMsg(msg)
 	case types.ConnectedMsg:
 		return m.handleConnectedMsg(msg)
 	case types.DisconnectedMsg:

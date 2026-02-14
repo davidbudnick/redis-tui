@@ -9,6 +9,15 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+func (m Model) handleAutoConnectMsg(msg types.AutoConnectMsg) (tea.Model, tea.Cmd) {
+	conn := msg.Connection
+	m.CurrentConn = &conn
+	m.Loading = true
+	m.StatusMsg = "Connecting..."
+	m.CLIConnection = nil // Consume so it doesn't re-trigger
+	return m, cmd.AutoConnectCmd(conn)
+}
+
 func (m Model) handleConnectionsLoadedMsg(msg types.ConnectionsLoadedMsg) (tea.Model, tea.Cmd) {
 	m.Loading = false
 	if msg.Err != nil {

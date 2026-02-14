@@ -86,6 +86,31 @@ func DisconnectCmd() tea.Cmd {
 	}
 }
 
+func AutoConnectCmd(conn types.Connection) tea.Cmd {
+	return func() tea.Msg {
+		if RedisClient == nil {
+			RedisClient = redis.NewClient()
+		}
+		var err error
+		if conn.UseCluster {
+			err = RedisClient.ConnectCluster([]string{fmt.Sprintf("%s:%d", conn.Host, conn.Port)}, conn.Password)
+		} else if conn.UseTLS && conn.TLSConfig != nil {
+			tlsCfg, tlsErr := conn.TLSConfig.BuildTLSConfig()
+			if tlsErr != nil {
+				slog.Error("Failed to build TLS config", "error", tlsErr)
+				return types.ConnectedMsg{Err: tlsErr}
+			}
+			err = RedisClient.ConnectWithTLS(conn.Host, conn.Port, conn.Password, conn.DB, tlsCfg)
+		} else {
+			err = RedisClient.Connect(conn.Host, conn.Port, conn.Password, conn.DB)
+		}
+		if err != nil {
+			slog.Error("Failed to connect", "error", err)
+		}
+		return types.ConnectedMsg{Err: err}
+	}
+}
+
 func TestConnectionCmd(host string, port int, password string, db int) tea.Cmd {
 	return func() tea.Msg {
 		if RedisClient == nil {
