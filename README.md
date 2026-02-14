@@ -244,7 +244,7 @@ Configuration is stored in `~/.config/redis-tui/config.json`.
   "connections": [
     {
       "id": 1,
-      "name": "Local Redis",
+      "name": "Standalone",
       "host": "localhost",
       "port": 6379,
       "db": 0,
@@ -253,66 +253,19 @@ Configuration is stored in `~/.config/redis-tui/config.json`.
     },
     {
       "id": 2,
-      "name": "Production (SSH)",
-      "host": "10.0.0.5",
-      "port": 6379,
-      "db": 0,
-      "group": "production",
-      "color": "#ff5555",
-      "use_ssh": true,
-      "ssh_config": {
-        "host": "bastion.example.com",
-        "port": 22,
-        "user": "deploy",
-        "private_key_path": "~/.ssh/id_ed25519"
-      },
-      "created_at": "2025-01-01T00:00:00Z",
-      "updated_at": "2025-01-01T00:00:00Z"
-    },
-    {
-      "id": 3,
-      "name": "Staging (TLS)",
-      "host": "staging-redis.example.com",
+      "name": "Cluster",
+      "host": "localhost",
       "port": 6380,
-      "db": 0,
-      "group": "staging",
-      "use_tls": true,
-      "tls_config": {
-        "cert_file": "/etc/redis/tls/client.crt",
-        "key_file": "/etc/redis/tls/client.key",
-        "ca_file": "/etc/redis/tls/ca.crt",
-        "server_name": "staging-redis.example.com"
-      },
-      "created_at": "2025-01-01T00:00:00Z",
-      "updated_at": "2025-01-01T00:00:00Z"
-    },
-    {
-      "id": 4,
-      "name": "Cluster Node",
-      "host": "cluster-1.example.com",
-      "port": 6379,
       "db": 0,
       "use_cluster": true,
       "created_at": "2025-01-01T00:00:00Z",
       "updated_at": "2025-01-01T00:00:00Z"
     }
   ],
-  "groups": [
-    {
-      "name": "production",
-      "color": "#ff5555",
-      "connections": [2]
-    },
-    {
-      "name": "staging",
-      "color": "#f1fa8c",
-      "connections": [3]
-    }
-  ],
   "favorites": [
     {
       "connection_id": 1,
-      "connection": "Local Redis",
+      "connection": "Standalone",
       "key": "app:config",
       "label": "App Settings",
       "added_at": "2025-01-15T10:30:00Z"
