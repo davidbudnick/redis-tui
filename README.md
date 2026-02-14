@@ -42,6 +42,7 @@ go install github.com/davidbudnick/redis-tui@latest
 - **JSON syntax highlighting** and JSON path queries
 
 ### Connections and Security
+- **CLI quick connect** — pass `--host`, `--port`, `--password`, etc. to connect without a config file
 - **Connection manager** — save and switch between multiple Redis instances
 - **TLS/SSL** encryption support
 - **SSH tunneling** for secure remote access
@@ -97,10 +98,44 @@ go install github.com/davidbudnick/redis-tui@latest
 ## Usage
 
 ```bash
+# Launch the interactive connection manager
 redis-tui
+
+# Quick connect to a Redis server
+redis-tui --host localhost
+
+# Connect with password and specific database
+redis-tui -h redis.example.com -p 6380 -a mypassword -n 2
+
+# Connect to a cluster node
+redis-tui --host redis.example.com --port 6380 --cluster
+
+# Connect with TLS
+redis-tui --host redis.example.com --tls --tls-ca /path/to/ca.pem
 ```
 
-Press `?` inside the app to view the full help screen. No CLI flags — all configuration is done through the [config file](#configuration) and the in-app connection manager.
+When `--host` is provided the TUI connects automatically on startup. Without flags the interactive connection manager is shown.
+
+Press `?` inside the app to view the full help screen.
+
+### CLI Flags
+
+| Flag | Short | Description | Default |
+| --- | --- | --- | --- |
+| `--host` | `-h` | Redis server hostname | |
+| `--port` | `-p` | Redis server port | 6379 |
+| `--password` | `-a` | Redis password | |
+| `--db` | `-n` | Database number (0-15) | 0 |
+| `--name` | | Connection display name | `host:port` |
+| `--cluster` | | Enable cluster mode | false |
+| `--tls` | | Enable TLS/SSL | false |
+| `--tls-cert` | | TLS client certificate file | |
+| `--tls-key` | | TLS client private key file | |
+| `--tls-ca` | | TLS CA certificate file | |
+| `--tls-skip-verify` | | Skip TLS certificate verification | false |
+| `--version` | | Print version and exit | |
+
+Short flags (`-h`, `-p`, `-a`, `-n`) follow [redis-cli](https://redis.io/docs/latest/develop/connect/cli/) conventions.
 
 ### Uninstall
 
@@ -175,11 +210,11 @@ Need a Redis instance to try redis-tui? Docker Compose files are included under 
 ```bash
 # Standalone Redis on port 6379
 docker compose -f examples/standalone/docker-compose.yml up -d
-redis-tui
+redis-tui -h localhost
 
 # 6-node cluster (3 masters + 3 replicas) on ports 6380-6385
 docker compose -f examples/cluster/docker-compose.yml up -d
-redis-tui -c localhost:6380
+redis-tui -h localhost -p 6380 --cluster
 ```
 
 ## Configuration
