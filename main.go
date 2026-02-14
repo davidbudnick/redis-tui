@@ -169,8 +169,13 @@ func initConfig() (*db.Config, error) {
 	// Migrate from legacy config path (~/.redis/config.json) if new config doesn't exist
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		legacyPath := filepath.Join(homeDir, ".redis", "config.json")
-		if legacyData, err := os.ReadFile(legacyPath); err == nil {
-			if writeErr := os.WriteFile(configPath, legacyData, 0600); writeErr == nil {
+		if _, legacyStatErr := os.Stat(legacyPath); legacyStatErr == nil {
+			legacyData, readErr := os.ReadFile(legacyPath) // #nosec G304 -- path is constructed from homeDir + hardcoded strings
+			if readErr != nil {
+				slog.Warn("Failed to read legacy config for migration", "path", legacyPath, "error", readErr)
+			} else if writeErr := os.WriteFile(configPath, legacyData, 0600); writeErr != nil {
+				slog.Warn("Failed to write migrated config", "from", legacyPath, "to", configPath, "error", writeErr)
+			} else {
 				slog.Info("Migrated config from legacy path", "from", legacyPath, "to", configPath)
 			}
 		}

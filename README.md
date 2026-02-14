@@ -328,14 +328,6 @@ Configuration is stored in `~/.config/redis-tui/config.json`.
       "type": "zset"
     }
   ],
-  "value_history": [
-    {
-      "key": "app:config",
-      "value": "old-value",
-      "timestamp": "2025-01-18T09:00:00Z",
-      "action": "edit"
-    }
-  ],
   "key_bindings": {
     "up": "k",
     "down": "j",
@@ -389,6 +381,8 @@ Configuration is stored in `~/.config/redis-tui/config.json`.
 ```
 
 > **Note:** Passwords and SSH passphrases are never saved to the config file. They are stripped before serialization for security. The config file is written with `0600` permissions (owner read/write only).
+
+> **TTL format:** `default_ttl` values in templates use Go's `time.Duration` nanosecond encoding: 1s = `1000000000`, 1m = `60000000000`, 1h = `3600000000000`.
 
 ### Connection Options
 
