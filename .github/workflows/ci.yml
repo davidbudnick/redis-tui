@@ -64,7 +64,7 @@ jobs:
           go build -ldflags "-s -w" -o "bin/${binary_name}" ./
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: redis-tui-${{ matrix.goos }}-${{ matrix.goarch }}
           path: bin/
