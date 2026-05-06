@@ -399,6 +399,37 @@ func TestCopy(t *testing.T) {
 	}
 }
 
+// Regression: copying on a non-zero DB must keep the destination key in that
+// same DB rather than landing in db0. See issue #29.
+func TestCopy_NonZeroDB(t *testing.T) {
+	client, mr := setupTestClient(t)
+
+	if err := client.SelectDB(5); err != nil {
+		t.Fatalf("SelectDB(5) error: %v", err)
+	}
+
+	mr.Select(5)
+	mr.Set("src", "original")
+
+	if err := client.Copy("src", "dst", false); err != nil {
+		t.Fatalf("Copy error: %v", err)
+	}
+
+	mr.Select(5)
+	dstVal, err := mr.Get("dst")
+	if err != nil {
+		t.Fatalf("miniredis Get(dst) on db5 error: %v", err)
+	}
+	if dstVal != "original" {
+		t.Errorf("dst value on db5 = %q, want %q", dstVal, "original")
+	}
+
+	mr.Select(0)
+	if mr.Exists("dst") {
+		t.Error("dst should not exist on db0 when copying on db5")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // MemoryUsage
 // ---------------------------------------------------------------------------
