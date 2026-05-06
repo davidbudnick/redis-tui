@@ -264,7 +264,10 @@ func (c *Client) Rename(oldKey, newKey string) error {
 	return c.cmdable().Rename(c.ctx, oldKey, newKey).Err()
 }
 
-// Copy copies a key
+// Copy copies a key within the currently selected database.
 func (c *Client) Copy(src, dst string, replace bool) error {
-	return c.cmdable().Copy(c.ctx, src, dst, 0, replace).Err()
+	c.mu.RLock()
+	db := c.db
+	c.mu.RUnlock()
+	return c.cmdable().Copy(c.ctx, src, dst, db, replace).Err()
 }
