@@ -81,6 +81,7 @@ internal/
 
 - **Conventional commits**: `feat:`, `fix:`, `docs:`, `test:`, `perf:`, `refactor:`, `chore:`
 - Keep subject line under 50 characters, imperative mood
+- **Net new changes ship via PR** — never push directly to `main`. After committing, create a feature branch and open a pull request using the `/pull-request` skill. If the change resolves a tracked issue, the PR description must back-link it (e.g. `Closes #29`) so GitHub auto-closes on merge.
 
 ## Guardrails
 
