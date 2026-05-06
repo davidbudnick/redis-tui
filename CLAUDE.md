@@ -82,6 +82,7 @@ internal/
 - **Conventional commits**: `feat:`, `fix:`, `docs:`, `test:`, `perf:`, `refactor:`, `chore:`
 - Keep subject line under 50 characters, imperative mood
 - **Net new changes ship via PR** — never push directly to `main`. After committing, create a feature branch and open a pull request using the `/pull-request` skill. If the change resolves a tracked issue, the PR description must back-link it (e.g. `Closes #29`) so GitHub auto-closes on merge.
+- **Standing authorization for PR plumbing**: pushing to a feature branch (`git push -u origin <branch>`) and opening the PR (`gh pr create --base main --body-file …`) do not need per-PR confirmation once the body has been shown and approved. Force-pushing, pushing to `main`, merging, or closing PRs still require explicit approval.
 
 ## Guardrails
 
