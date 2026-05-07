@@ -216,8 +216,8 @@ rm -f $(go env GOPATH)/bin/redis-tui
 | `i`                  | Server info             | `Ctrl+X` | View expiring keys     |
 | `D`                  | Switch database         | `m`      | Live metrics dashboard |
 | `f`                  | Flush database          | `M`      | Memory stats           |
-| `p`                  | Pub/Sub channels        | `K`      | Cluster info           |
-| `L`                  | View slow log           | `=`      | Compare keys           |
+| `p`                  | Pub/Sub channels        | `C`      | Cluster info           |
+| `L`                  | View slow log           | `K`      | Compare keys           |
 | `E`                  | Execute Lua script      | `P`      | Key templates          |
 | `Ctrl+G`             | Redis config            |          |                        |
 
@@ -248,7 +248,17 @@ redis-tui -h localhost
 # 6-node cluster (3 masters + 3 replicas) on ports 6380-6385
 docker compose -f examples/cluster/docker-compose.yml up -d
 redis-tui -h localhost -p 6380 --cluster
+
+# Standalone Redis Stack (RedisJSON, RediSearch, etc.) on port 6390
+docker compose -f examples/standalone-redis-stack/docker-compose.yml up -d
+redis-tui -h localhost -p 6390
+
+# Redis Stack cluster on ports 6386-6392
+docker compose -f examples/cluster-redis-stack/docker-compose.yml up -d
+redis-tui -h localhost -p 6386 --cluster
 ```
+
+The `Makefile` also exposes shortcuts for these (`make docker-up-standalone`, `make docker-up-cluster`, `make docker-up-standalone-stack`, `make docker-up-cluster-stack`) along with matching `docker-down-*` and `docker-seed-*` targets.
 
 ## Configuration
 
@@ -345,51 +355,6 @@ Configuration is stored in `~/.config/redis-tui/config.json`.
       "type": "zset"
     }
   ],
-  "key_bindings": {
-    "up": "k",
-    "down": "j",
-    "left": "h",
-    "right": "l",
-    "page_up": "ctrl+u",
-    "page_down": "ctrl+d",
-    "top": "g",
-    "bottom": "G",
-    "select": "enter",
-    "back": "esc",
-    "quit": "q",
-    "help": "?",
-    "refresh": "r",
-    "delete": "d",
-    "add": "a",
-    "edit": "e",
-    "copy": "c",
-    "rename": "R",
-    "search": "/",
-    "filter": "f",
-    "favorite": "F",
-    "watch": "w",
-    "export": "E",
-    "import": "I",
-    "server_info": "i",
-    "slow_log": "L",
-    "lua_script": "X",
-    "pubsub": "p",
-    "switch_db": "D",
-    "ttl": "t",
-    "bulk_delete": "B",
-    "tree_view": "T",
-    "memory_stats": "M",
-    "client_list": "C",
-    "cluster_info": "K",
-    "compare_keys": "=",
-    "json_path": "J",
-    "copy_clipboard": "y",
-    "logs": "O",
-    "themes": "ctrl+t",
-    "recent_keys": "H",
-    "favorites": "ctrl+f",
-    "value_history": "u"
-  },
   "tree_separator": ":",
   "max_recent_keys": 20,
   "max_value_history": 50,
@@ -403,32 +368,30 @@ Configuration is stored in `~/.config/redis-tui/config.json`.
 
 ### Connection Options
 
-| Option                            | Description                                 |
-| --------------------------------- | ------------------------------------------- |
-| `name`                            | Display name for the connection             |
-| `host`                            | Redis server hostname or IP                 |
-| `port`                            | Redis server port (default: 6379)           |
-| `password`                        | Redis password (never saved to disk)        |
-| `db`                              | Redis database number (0-15)                |
-| `username`                        | Redis ACL username (optional)               |
-| `group`                           | Connection group name (optional)            |
-| `color`                           | Display color for the connection (optional) |
-| `use_tls`                         | Enable TLS/SSL connection                   |
-| `tls_config.cert_file`            | Client certificate file path                |
-| `tls_config.key_file`             | Client key file path                        |
-| `tls_config.ca_file`              | CA certificate file path                    |
-| `tls_config.insecure_skip_verify` | Skip TLS certificate verification           |
-| `tls_config.server_name`          | TLS server name for verification            |
-| `use_ssh`                         | Enable SSH tunneling                        |
-| `ssh_config.host`                 | SSH server hostname                         |
-| `ssh_config.port`                 | SSH server port                             |
-| `ssh_config.user`                 | SSH username                                |
-| `ssh_config.private_key_path`     | Path to SSH private key file                |
-| `use_cluster`                     | Enable Redis cluster mode                   |
-
-### Custom Keybindings
-
-Keybindings can be customized in the configuration file under the `key_bindings` section. All navigation and action keys can be remapped to your preference. See the full example above for the complete list of customizable bindings and their default values.
+| Option                            | Description                                                 |
+| --------------------------------- | ----------------------------------------------------------- |
+| `name`                            | Display name for the connection                             |
+| `host`                            | Redis server hostname or IP                                 |
+| `port`                            | Redis server port (default: 6379)                           |
+| `password`                        | Redis password (never saved to disk)                        |
+| `db`                              | Redis database number (0-15)                                |
+| `username`                        | Redis ACL username (optional)                               |
+| `group`                           | Connection group name (optional)                            |
+| `color`                           | Display color for the connection (optional)                 |
+| `use_tls`                         | Enable TLS/SSL connection                                   |
+| `tls_config.cert_file`            | Client certificate file path                                |
+| `tls_config.key_file`             | Client key file path                                        |
+| `tls_config.ca_file`              | CA certificate file path                                    |
+| `tls_config.insecure_skip_verify` | Skip TLS certificate verification                           |
+| `tls_config.server_name`          | TLS server name for verification                            |
+| `use_ssh`                         | Enable SSH tunneling                                        |
+| `ssh_config.host`                 | SSH server hostname                                         |
+| `ssh_config.port`                 | SSH server port                                             |
+| `ssh_config.user`                 | SSH username                                                |
+| `ssh_config.password`             | SSH password (never saved to disk)                          |
+| `ssh_config.private_key_path`     | Path to SSH private key file                                |
+| `ssh_config.passphrase`           | Passphrase for encrypted private key (never saved to disk)  |
+| `use_cluster`                     | Enable Redis cluster mode                                   |
 
 ## Requirements
 
@@ -508,6 +471,9 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - [Lip Gloss](https://github.com/charmbracelet/lipgloss) - Styling library
 - [Bubbles](https://github.com/charmbracelet/bubbles) - TUI components
 - [go-redis](https://github.com/redis/go-redis) - Redis client
+- [vimtea](https://github.com/kujtimiihoxha/vimtea) - VIM editor component for inline editing
+- [miniredis](https://github.com/alicebob/miniredis) - In-memory Redis used in tests
+- [chroma](https://github.com/alecthomas/chroma) - Syntax highlighting for JSON values
 
 ## Keywords
 
