@@ -1,6 +1,6 @@
 module github.com/davidbudnick/redis-tui
 
-go 1.26
+go 1.26.3
 
 require (
 	github.com/alicebob/miniredis/v2 v2.37.0
