@@ -62,7 +62,7 @@ jobs:
           echo "All functions at 100% coverage"
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           files: ./coverage.out
           fail_ci_if_error: false
