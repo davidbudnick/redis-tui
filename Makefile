@@ -6,7 +6,7 @@ COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 LDFLAGS := -ldflags "-X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)"
 
-.PHONY: all build install clean test test-cover test-cover-check lint run release snapshot \
+.PHONY: all build install clean test test-cover test-cover-check lint run release snapshot demo \
 	docker-up docker-down docker-seed \
 	docker-up-standalone docker-up-standalone-stack docker-up-cluster docker-up-cluster-stack \
 	docker-down-standalone docker-down-standalone-stack docker-down-cluster docker-down-cluster-stack \
@@ -152,6 +152,14 @@ docker-down-cluster-stack:
 docker-seed-cluster-stack:
 	go run ./examples/seed -addr localhost:6386 -cluster -flush
 
+## --- Demo ---
+
+## Render the README demo GIF against an isolated demo config.
+## Built without $(LDFLAGS) so main.version stays "dev" and the update banner is suppressed.
+demo: docker-up-standalone docker-up-cluster docker-seed-standalone docker-seed-cluster
+	go build -o bin/$(APP_NAME) ./
+	vhs docs/demo.tape
+
 ## Show help
 help:
 	@echo "Available targets:"
@@ -179,5 +187,8 @@ help:
 	@echo "    docker-up-standalone-stack - Standalone Redis Stack (:6390)"
 	@echo "    docker-up-cluster          - Cluster (:6380-6385)"
 	@echo "    docker-up-cluster-stack    - Cluster Redis Stack (:6386-6392)"
+	@echo ""
+	@echo "  Demo:"
+	@echo "    demo        - Render the README demo GIF"
 	@echo ""
 	@echo "    help        - Show this help"
