@@ -12,7 +12,7 @@ import (
 
 	"github.com/davidbudnick/redis-tui/internal/types"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // detectedOS is the runtime OS, overridable in tests.

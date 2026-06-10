@@ -6,7 +6,7 @@ import (
 
 	"github.com/davidbudnick/redis-tui/internal/types"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // Import/Export handlers

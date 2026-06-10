@@ -3,10 +3,10 @@ package ui
 import (
 	"github.com/davidbudnick/redis-tui/internal/types"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
-func (m Model) handleFavoritesScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleFavoritesScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":
 		if m.SelectedFavIdx > 0 {
@@ -38,7 +38,7 @@ func (m Model) handleFavoritesScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleRecentKeysScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleRecentKeysScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":
 		if m.SelectedRecentIdx > 0 {
@@ -66,7 +66,7 @@ func (m Model) handleRecentKeysScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleTreeViewScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleTreeViewScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":
 		if m.SelectedTreeIdx > 0 {
@@ -76,7 +76,7 @@ func (m Model) handleTreeViewScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.SelectedTreeIdx < len(m.TreeNodes)-1 {
 			m.SelectedTreeIdx++
 		}
-	case "enter", " ":
+	case "enter", "space":
 		if len(m.TreeNodes) > 0 && m.SelectedTreeIdx < len(m.TreeNodes) {
 			node := m.TreeNodes[m.SelectedTreeIdx]
 			if !node.IsKey {
@@ -99,7 +99,7 @@ func (m Model) handleTreeViewScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleTemplatesScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleTemplatesScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":
 		if m.SelectedTemplateIdx > 0 {
@@ -124,7 +124,7 @@ func (m Model) handleTemplatesScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleValueHistoryScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleValueHistoryScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":
 		if m.SelectedHistoryIdx > 0 {
@@ -147,7 +147,7 @@ func (m Model) handleValueHistoryScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleKeyspaceEventsScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleKeyspaceEventsScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "c":
 		m.KeyspaceEvents = nil
@@ -157,7 +157,7 @@ func (m Model) handleKeyspaceEventsScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleWatchKeyScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleWatchKeyScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.WatchActive = false
@@ -166,7 +166,7 @@ func (m Model) handleWatchKeyScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleConnectionGroupsScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleConnectionGroupsScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":
 		if m.SelectedGroupIdx > 0 {
@@ -182,7 +182,7 @@ func (m Model) handleConnectionGroupsScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 	return m, nil
 }
 
-func (m Model) handleExpiringKeysScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleExpiringKeysScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":
 		if m.SelectedKeyIdx > 0 {

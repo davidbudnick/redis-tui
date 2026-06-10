@@ -3,7 +3,7 @@ package ui
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/davidbudnick/redis-tui/internal/types"
 )
 
@@ -25,7 +25,7 @@ func TestHandleFavoritesScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Favorites = favs
 		m.Keys = []types.RedisKey{{Key: "a"}}
-		_, cmd := m.handleFavoritesScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleFavoritesScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -34,14 +34,14 @@ func TestHandleFavoritesScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Favorites = favs
 		m.Keys = []types.RedisKey{{Key: "other"}}
-		_, cmd := m.handleFavoritesScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleFavoritesScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd != nil {
 			t.Error("expected nil cmd")
 		}
 	})
 	t.Run("enter empty", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleFavoritesScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, _ = m.handleFavoritesScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 	})
 	t.Run("d removes", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
@@ -57,7 +57,7 @@ func TestHandleFavoritesScreen(t *testing.T) {
 	})
 	t.Run("esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleFavoritesScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleFavoritesScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 }
 
@@ -79,7 +79,7 @@ func TestHandleRecentKeysScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.RecentKeys = recents
 		m.Keys = []types.RedisKey{{Key: "a"}}
-		_, cmd := m.handleRecentKeysScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleRecentKeysScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -87,15 +87,15 @@ func TestHandleRecentKeysScreen(t *testing.T) {
 	t.Run("enter not matching", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.RecentKeys = recents
-		_, _ = m.handleRecentKeysScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, _ = m.handleRecentKeysScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 	})
 	t.Run("enter empty", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleRecentKeysScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, _ = m.handleRecentKeysScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 	})
 	t.Run("esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleRecentKeysScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleRecentKeysScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 }
 
@@ -119,7 +119,7 @@ func TestHandleTreeViewScreen(t *testing.T) {
 	t.Run("enter expands folder", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.TreeNodes = nodes
-		result, _ := m.handleTreeViewScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		result, _ := m.handleTreeViewScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if !result.(Model).TreeExpanded["user:"] {
 			t.Error("expected expanded")
 		}
@@ -127,14 +127,14 @@ func TestHandleTreeViewScreen(t *testing.T) {
 	t.Run("space also expands", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.TreeNodes = nodes
-		_, _ = m.handleTreeViewScreen(tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}})
+		_, _ = m.handleTreeViewScreen(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
 	})
 	t.Run("enter key navigates", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.TreeNodes = nodes
 		m.SelectedTreeIdx = 1
 		m.Keys = []types.RedisKey{{Key: "user:1"}}
-		_, cmd := m.handleTreeViewScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleTreeViewScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -143,15 +143,15 @@ func TestHandleTreeViewScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.TreeNodes = nodes
 		m.SelectedTreeIdx = 1
-		_, _ = m.handleTreeViewScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, _ = m.handleTreeViewScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 	})
 	t.Run("enter empty", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleTreeViewScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, _ = m.handleTreeViewScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 	})
 	t.Run("esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleTreeViewScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleTreeViewScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 }
 
@@ -174,18 +174,18 @@ func TestHandleTemplatesScreen(t *testing.T) {
 	t.Run("enter uses template", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Templates = tmpls
-		result, _ := m.handleTemplatesScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		result, _ := m.handleTemplatesScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if result.(Model).Screen != types.ScreenAddKey {
 			t.Errorf("expected ScreenAddKey, got %v", result.(Model).Screen)
 		}
 	})
 	t.Run("enter empty", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleTemplatesScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, _ = m.handleTemplatesScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 	})
 	t.Run("esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleTemplatesScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleTemplatesScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 }
 
@@ -207,7 +207,7 @@ func TestHandleValueHistoryScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.CurrentKey = &types.RedisKey{Key: "a"}
 		m.ValueHistory = hist
-		_, cmd := m.handleValueHistoryScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleValueHistoryScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -215,14 +215,14 @@ func TestHandleValueHistoryScreen(t *testing.T) {
 	t.Run("enter no current", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.ValueHistory = hist
-		_, cmd := m.handleValueHistoryScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleValueHistoryScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd != nil {
 			t.Error("expected nil cmd")
 		}
 	})
 	t.Run("esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleValueHistoryScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleValueHistoryScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 }
 
@@ -237,14 +237,14 @@ func TestHandleKeyspaceEventsScreen(t *testing.T) {
 	})
 	t.Run("esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleKeyspaceEventsScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleKeyspaceEventsScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 }
 
 func TestHandleWatchKeyScreen(t *testing.T) {
 	m, _, _ := newTestModel(t)
 	m.WatchActive = true
-	result, _ := m.handleWatchKeyScreen(tea.KeyMsg{Type: tea.KeyEsc})
+	result, _ := m.handleWatchKeyScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	if result.(Model).WatchActive {
 		t.Error("expected watch off")
 	}
@@ -266,7 +266,7 @@ func TestHandleConnectionGroupsScreen(t *testing.T) {
 	})
 	t.Run("esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleConnectionGroupsScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleConnectionGroupsScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 }
 
@@ -287,17 +287,17 @@ func TestHandleExpiringKeysScreen(t *testing.T) {
 	t.Run("enter opens", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.ExpiringKeys = keys
-		_, cmd := m.handleExpiringKeysScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleExpiringKeysScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
 	})
 	t.Run("enter empty", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleExpiringKeysScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, _ = m.handleExpiringKeysScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 	})
 	t.Run("esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleExpiringKeysScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleExpiringKeysScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 }

@@ -3,7 +3,7 @@ package ui
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/davidbudnick/redis-tui/internal/types"
 )
 
@@ -35,14 +35,14 @@ func TestAddKeyFieldCount(t *testing.T) {
 func TestHandleAddKeyScreen(t *testing.T) {
 	t.Run("tab advances", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleAddKeyScreen(tea.KeyMsg{Type: tea.KeyTab})
+		result, _ := m.handleAddKeyScreen(tea.KeyPressMsg{Code: tea.KeyTab})
 		if result.(Model).AddKeyFocusIdx != 1 {
 			t.Errorf("expected 1, got %d", result.(Model).AddKeyFocusIdx)
 		}
 	})
 	t.Run("shift+tab back wraps", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleAddKeyScreen(tea.KeyMsg{Type: tea.KeyShiftTab})
+		result, _ := m.handleAddKeyScreen(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
 		if result.(Model).AddKeyFocusIdx != 1 {
 			t.Errorf("expected wrap to 1, got %d", result.(Model).AddKeyFocusIdx)
 		}
@@ -50,7 +50,7 @@ func TestHandleAddKeyScreen(t *testing.T) {
 	t.Run("ctrl+t cycles type", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.AddKeyType = types.KeyTypeString
-		result, _ := m.handleAddKeyScreen(tea.KeyMsg{Type: tea.KeyCtrlT})
+		result, _ := m.handleAddKeyScreen(tea.KeyPressMsg{Code: 't', Mod: tea.ModCtrl})
 		if result.(Model).AddKeyType == types.KeyTypeString {
 			t.Error("expected type to change")
 		}
@@ -59,13 +59,13 @@ func TestHandleAddKeyScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.AddKeyType = types.KeyTypeHash // 3 fields
 		m.AddKeyFocusIdx = 2
-		_, _ = m.handleAddKeyScreen(tea.KeyMsg{Type: tea.KeyCtrlT}) // advances to Stream (still 3) — OK
+		_, _ = m.handleAddKeyScreen(tea.KeyPressMsg{Code: 't', Mod: tea.ModCtrl}) // advances to Stream (still 3) — OK
 		// Try again to eventually get a 2-field type
 	})
 	t.Run("enter submits", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.AddKeyInputs[0].SetValue("key1")
-		_, cmd := m.handleAddKeyScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleAddKeyScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected create cmd")
 		}
@@ -74,21 +74,21 @@ func TestHandleAddKeyScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.AddKeyType = types.KeyTypeHash
 		m.AddKeyInputs[0].SetValue("key1")
-		_, cmd := m.handleAddKeyScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleAddKeyScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
 	})
 	t.Run("enter empty", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, cmd := m.handleAddKeyScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleAddKeyScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd != nil {
 			t.Error("expected nil cmd")
 		}
 	})
 	t.Run("esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleAddKeyScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		result, _ := m.handleAddKeyScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 		if result.(Model).Screen != types.ScreenKeys {
 			t.Errorf("expected ScreenKeys, got %v", result.(Model).Screen)
 		}
@@ -113,7 +113,7 @@ func TestHandleConfirmDeleteScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.ConfirmType = "key"
 		m.ConfirmData = types.RedisKey{Key: "foo"}
-		_, cmd := m.handleConfirmDeleteScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleConfirmDeleteScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -146,7 +146,7 @@ func TestHandleConfirmDeleteScreen(t *testing.T) {
 	t.Run("n cancel key without current", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.ConfirmType = "key"
-		result, _ := m.handleConfirmDeleteScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		result, _ := m.handleConfirmDeleteScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 		if result.(Model).Screen != types.ScreenKeys {
 			t.Errorf("expected ScreenKeys, got %v", result.(Model).Screen)
 		}
@@ -184,7 +184,7 @@ func TestHandleTTLEditorScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.CurrentKey = &types.RedisKey{Key: "foo"}
 		m.Inputs.TTLInput.SetValue("30")
-		_, cmd := m.handleTTLEditorScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleTTLEditorScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -193,21 +193,21 @@ func TestHandleTTLEditorScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.CurrentKey = &types.RedisKey{Key: "foo"}
 		m.Inputs.TTLInput.SetValue("abc")
-		result, _ := m.handleTTLEditorScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		result, _ := m.handleTTLEditorScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if result.(Model).StatusMsg == "" {
 			t.Error("expected error status")
 		}
 	})
 	t.Run("enter no current", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, cmd := m.handleTTLEditorScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleTTLEditorScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd != nil {
 			t.Error("expected nil cmd")
 		}
 	})
 	t.Run("esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleTTLEditorScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleTTLEditorScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 	t.Run("default input", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
@@ -220,7 +220,7 @@ func TestHandleEditValueScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.CurrentKey = &types.RedisKey{Key: "foo", Type: types.KeyTypeString}
 		m.VimEditor = createVimEditor("content", 80, 24, "")
-		_, cmd := m.handleEditValueScreen(tea.KeyMsg{Type: tea.KeyCtrlS})
+		_, cmd := m.handleEditValueScreen(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 		if cmd == nil {
 			t.Error("expected save cmd")
 		}
@@ -229,18 +229,18 @@ func TestHandleEditValueScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.CurrentKey = &types.RedisKey{Key: "foo", Type: types.KeyTypeJSON}
 		m.VimEditor = createVimEditor(`{"a":1}`, 80, 24, "v.json")
-		_, cmd := m.handleEditValueScreen(tea.KeyMsg{Type: tea.KeyCtrlS})
+		_, cmd := m.handleEditValueScreen(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 		if cmd == nil {
 			t.Error("expected save cmd")
 		}
 	})
 	t.Run("ctrl+s nil key", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleEditValueScreen(tea.KeyMsg{Type: tea.KeyCtrlS})
+		_, _ = m.handleEditValueScreen(tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl})
 	})
 	t.Run("ctrl+q quits", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleEditValueScreen(tea.KeyMsg{Type: tea.KeyCtrlQ})
+		result, _ := m.handleEditValueScreen(tea.KeyPressMsg{Code: 'q', Mod: tea.ModCtrl})
 		if result.(Model).Screen != types.ScreenKeyDetail {
 			t.Errorf("expected ScreenKeyDetail, got %v", result.(Model).Screen)
 		}
@@ -265,14 +265,14 @@ func TestHandleAddToCollectionScreen(t *testing.T) {
 
 	t.Run("tab advances", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleAddToCollectionScreen(tea.KeyMsg{Type: tea.KeyTab})
+		result, _ := m.handleAddToCollectionScreen(tea.KeyPressMsg{Code: tea.KeyTab})
 		if result.(Model).AddCollFocusIdx != 1 {
 			t.Errorf("expected 1, got %d", result.(Model).AddCollFocusIdx)
 		}
 	})
 	t.Run("shift+tab wraps", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleAddToCollectionScreen(tea.KeyMsg{Type: tea.KeyShiftTab})
+		result, _ := m.handleAddToCollectionScreen(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
 		if result.(Model).AddCollFocusIdx != 1 {
 			t.Errorf("expected 1, got %d", result.(Model).AddCollFocusIdx)
 		}
@@ -280,7 +280,7 @@ func TestHandleAddToCollectionScreen(t *testing.T) {
 	t.Run("enter list", func(t *testing.T) {
 		m := setup(t, types.KeyTypeList)
 		m.AddCollectionInput[0].SetValue("v")
-		_, cmd := m.handleAddToCollectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleAddToCollectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -288,7 +288,7 @@ func TestHandleAddToCollectionScreen(t *testing.T) {
 	t.Run("enter set", func(t *testing.T) {
 		m := setup(t, types.KeyTypeSet)
 		m.AddCollectionInput[0].SetValue("v")
-		_, cmd := m.handleAddToCollectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleAddToCollectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -297,7 +297,7 @@ func TestHandleAddToCollectionScreen(t *testing.T) {
 		m := setup(t, types.KeyTypeZSet)
 		m.AddCollectionInput[0].SetValue("m")
 		m.AddCollectionInput[1].SetValue("3.14")
-		_, cmd := m.handleAddToCollectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleAddToCollectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -305,7 +305,7 @@ func TestHandleAddToCollectionScreen(t *testing.T) {
 	t.Run("enter zset no score", func(t *testing.T) {
 		m := setup(t, types.KeyTypeZSet)
 		m.AddCollectionInput[0].SetValue("m")
-		_, cmd := m.handleAddToCollectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleAddToCollectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -314,7 +314,7 @@ func TestHandleAddToCollectionScreen(t *testing.T) {
 		m := setup(t, types.KeyTypeZSet)
 		m.AddCollectionInput[0].SetValue("m")
 		m.AddCollectionInput[1].SetValue("bad")
-		result, _ := m.handleAddToCollectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		result, _ := m.handleAddToCollectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if result.(Model).StatusMsg == "" {
 			t.Error("expected error status")
 		}
@@ -323,7 +323,7 @@ func TestHandleAddToCollectionScreen(t *testing.T) {
 		m := setup(t, types.KeyTypeHash)
 		m.AddCollectionInput[0].SetValue("f")
 		m.AddCollectionInput[1].SetValue("v")
-		_, cmd := m.handleAddToCollectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleAddToCollectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -331,7 +331,7 @@ func TestHandleAddToCollectionScreen(t *testing.T) {
 	t.Run("enter hash default value", func(t *testing.T) {
 		m := setup(t, types.KeyTypeHash)
 		m.AddCollectionInput[0].SetValue("f")
-		_, cmd := m.handleAddToCollectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleAddToCollectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -340,7 +340,7 @@ func TestHandleAddToCollectionScreen(t *testing.T) {
 		m := setup(t, types.KeyTypeStream)
 		m.AddCollectionInput[0].SetValue("f")
 		m.AddCollectionInput[1].SetValue("v")
-		_, cmd := m.handleAddToCollectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleAddToCollectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -348,7 +348,7 @@ func TestHandleAddToCollectionScreen(t *testing.T) {
 	t.Run("enter hll", func(t *testing.T) {
 		m := setup(t, types.KeyTypeHyperLogLog)
 		m.AddCollectionInput[0].SetValue("v")
-		_, cmd := m.handleAddToCollectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleAddToCollectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -356,7 +356,7 @@ func TestHandleAddToCollectionScreen(t *testing.T) {
 	t.Run("enter bitmap valid", func(t *testing.T) {
 		m := setup(t, types.KeyTypeBitmap)
 		m.AddCollectionInput[0].SetValue("5")
-		_, cmd := m.handleAddToCollectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleAddToCollectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -364,7 +364,7 @@ func TestHandleAddToCollectionScreen(t *testing.T) {
 	t.Run("enter bitmap invalid", func(t *testing.T) {
 		m := setup(t, types.KeyTypeBitmap)
 		m.AddCollectionInput[0].SetValue("bad")
-		result, _ := m.handleAddToCollectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		result, _ := m.handleAddToCollectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if result.(Model).StatusMsg == "" {
 			t.Error("expected error status")
 		}
@@ -373,7 +373,7 @@ func TestHandleAddToCollectionScreen(t *testing.T) {
 		m := setup(t, types.KeyTypeGeo)
 		m.AddCollectionInput[0].SetValue("place")
 		m.AddCollectionInput[1].SetValue("-122.4, 37.7")
-		_, cmd := m.handleAddToCollectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleAddToCollectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -382,7 +382,7 @@ func TestHandleAddToCollectionScreen(t *testing.T) {
 		m := setup(t, types.KeyTypeGeo)
 		m.AddCollectionInput[0].SetValue("place")
 		m.AddCollectionInput[1].SetValue("bad,37.7")
-		result, _ := m.handleAddToCollectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		result, _ := m.handleAddToCollectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if result.(Model).StatusMsg == "" {
 			t.Error("expected error")
 		}
@@ -391,7 +391,7 @@ func TestHandleAddToCollectionScreen(t *testing.T) {
 		m := setup(t, types.KeyTypeGeo)
 		m.AddCollectionInput[0].SetValue("place")
 		m.AddCollectionInput[1].SetValue("-122.4,bad")
-		result, _ := m.handleAddToCollectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		result, _ := m.handleAddToCollectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if result.(Model).StatusMsg == "" {
 			t.Error("expected error")
 		}
@@ -399,7 +399,7 @@ func TestHandleAddToCollectionScreen(t *testing.T) {
 	t.Run("enter geo no coords", func(t *testing.T) {
 		m := setup(t, types.KeyTypeGeo)
 		m.AddCollectionInput[0].SetValue("place")
-		_, cmd := m.handleAddToCollectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleAddToCollectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -407,14 +407,14 @@ func TestHandleAddToCollectionScreen(t *testing.T) {
 	t.Run("enter nil current key", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.AddCollectionInput[0].SetValue("x")
-		_, cmd := m.handleAddToCollectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleAddToCollectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd != nil {
 			t.Error("expected nil cmd")
 		}
 	})
 	t.Run("esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleAddToCollectionScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleAddToCollectionScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 	t.Run("default input", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
@@ -452,7 +452,7 @@ func TestHandleRemoveFromCollectionScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.CurrentKey = &types.RedisKey{Key: "foo", Type: types.KeyTypeSet}
 		m.CurrentValue = types.RedisValue{Type: types.KeyTypeSet, SetValue: []string{"a"}}
-		_, cmd := m.handleRemoveFromCollectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleRemoveFromCollectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -505,7 +505,7 @@ func TestHandleRemoveFromCollectionScreen(t *testing.T) {
 	})
 	t.Run("esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleRemoveFromCollectionScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleRemoveFromCollectionScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 }
 
@@ -514,7 +514,7 @@ func TestHandleRenameKeyScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.CurrentKey = &types.RedisKey{Key: "old"}
 		m.Inputs.RenameInput.SetValue("new")
-		_, cmd := m.handleRenameKeyScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleRenameKeyScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -523,7 +523,7 @@ func TestHandleRenameKeyScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.CurrentKey = &types.RedisKey{Key: "foo"}
 		m.Inputs.RenameInput.SetValue("foo")
-		_, cmd := m.handleRenameKeyScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleRenameKeyScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd != nil {
 			t.Error("expected nil cmd for same name")
 		}
@@ -531,14 +531,14 @@ func TestHandleRenameKeyScreen(t *testing.T) {
 	t.Run("enter empty", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.CurrentKey = &types.RedisKey{Key: "foo"}
-		_, cmd := m.handleRenameKeyScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleRenameKeyScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd != nil {
 			t.Error("expected nil cmd")
 		}
 	})
 	t.Run("esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleRenameKeyScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleRenameKeyScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 	t.Run("default", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
@@ -551,7 +551,7 @@ func TestHandleCopyKeyScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.CurrentKey = &types.RedisKey{Key: "foo"}
 		m.Inputs.CopyInput.SetValue("foo_copy")
-		_, cmd := m.handleCopyKeyScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleCopyKeyScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -559,14 +559,14 @@ func TestHandleCopyKeyScreen(t *testing.T) {
 	t.Run("enter empty", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.CurrentKey = &types.RedisKey{Key: "foo"}
-		_, cmd := m.handleCopyKeyScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleCopyKeyScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd != nil {
 			t.Error("expected nil cmd")
 		}
 	})
 	t.Run("esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleCopyKeyScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleCopyKeyScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 	t.Run("default", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
@@ -578,21 +578,21 @@ func TestHandleBulkDeleteScreen(t *testing.T) {
 	t.Run("enter valid", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Inputs.BulkDeleteInput.SetValue("user:*")
-		_, cmd := m.handleBulkDeleteScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleBulkDeleteScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
 	})
 	t.Run("enter empty", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, cmd := m.handleBulkDeleteScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleBulkDeleteScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd != nil {
 			t.Error("expected nil cmd")
 		}
 	})
 	t.Run("esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleBulkDeleteScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleBulkDeleteScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 	t.Run("default", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
@@ -604,18 +604,18 @@ func TestHandleBatchTTLScreen(t *testing.T) {
 	t.Run("tab toggles focus", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Inputs.BatchTTLInput.Focus()
-		_, _ = m.handleBatchTTLScreen(tea.KeyMsg{Type: tea.KeyTab})
+		_, _ = m.handleBatchTTLScreen(tea.KeyPressMsg{Code: tea.KeyTab})
 	})
 	t.Run("tab from pattern", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Inputs.BatchTTLPattern.Focus()
-		_, _ = m.handleBatchTTLScreen(tea.KeyMsg{Type: tea.KeyTab})
+		_, _ = m.handleBatchTTLScreen(tea.KeyPressMsg{Code: tea.KeyTab})
 	})
 	t.Run("enter valid", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Inputs.BatchTTLInput.SetValue("30")
 		m.Inputs.BatchTTLPattern.SetValue("user:*")
-		_, cmd := m.handleBatchTTLScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleBatchTTLScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -624,21 +624,21 @@ func TestHandleBatchTTLScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Inputs.BatchTTLInput.SetValue("bad")
 		m.Inputs.BatchTTLPattern.SetValue("user:*")
-		_, cmd := m.handleBatchTTLScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleBatchTTLScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd != nil {
 			t.Error("expected nil cmd")
 		}
 	})
 	t.Run("enter empty", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, cmd := m.handleBatchTTLScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleBatchTTLScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd != nil {
 			t.Error("expected nil cmd")
 		}
 	})
 	t.Run("esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleBatchTTLScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleBatchTTLScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 	t.Run("default input to focused", func(t *testing.T) {
 		m, _, _ := newTestModel(t)

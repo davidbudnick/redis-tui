@@ -8,49 +8,16 @@ import (
 	"time"
 
 	"github.com/davidbudnick/redis-tui/internal/types"
-	"github.com/kujtimiihoxha/vimtea"
+	"github.com/davidbudnick/redis-tui/internal/ui/editor"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
-func createVimEditor(content string, width, height int, fileName string) vimtea.Editor {
-	opts := []vimtea.EditorOption{
-		vimtea.WithContent(content),
-		vimtea.WithEnableStatusBar(true),
-		vimtea.WithEnableModeCommand(true),
-	}
-	if fileName != "" {
-		opts = append(opts, vimtea.WithFileName(fileName))
-	}
-	editor := vimtea.NewEditor(opts...)
-
-	// Add :w command to save
-	editor.AddCommand("w", func(buf vimtea.Buffer, args []string) tea.Cmd {
-		return func() tea.Msg {
-			return types.EditorSaveMsg{Content: buf.Text()}
-		}
-	})
-
-	// Add :q command to quit
-	editor.AddCommand("q", func(buf vimtea.Buffer, args []string) tea.Cmd {
-		return func() tea.Msg {
-			return types.EditorQuitMsg{}
-		}
-	})
-
-	// Add :wq command to save and quit
-	editor.AddCommand("wq", func(buf vimtea.Buffer, args []string) tea.Cmd {
-		return func() tea.Msg {
-			return types.EditorSaveMsg{Content: buf.Text()}
-		}
-	})
-
-	// Set size after creation
-	sized, _ := editor.SetSize(width, height)
-	return sized.(vimtea.Editor)
+func createVimEditor(content string, width, height int, fileName string) *editor.Model {
+	return editor.New(content, width, height, fileName)
 }
 
-func (m Model) handleKeysScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleKeysScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.Inputs.PatternInput.Focused() {
 		switch msg.String() {
 		case "enter":
@@ -317,7 +284,7 @@ func (m *Model) sortKeys() {
 	})
 }
 
-func (m Model) handleKeyDetailScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleKeyDetailScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "d", "delete":
 		if m.CurrentKey != nil {

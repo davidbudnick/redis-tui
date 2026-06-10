@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"charm.land/lipgloss/v2"
 	"github.com/davidbudnick/redis-tui/internal/types"
 )
 
@@ -373,19 +374,19 @@ func TestViewLiveMetrics(t *testing.T) {
 
 func TestRenderLineChart(t *testing.T) {
 	t.Run("empty data", func(t *testing.T) {
-		out := renderLineChart("test", nil, 50, 5, "39")
+		out := renderLineChart("test", nil, 50, 5, lipgloss.Color("39"))
 		if out != "" {
 			t.Error("expected empty output for empty data")
 		}
 	})
 	t.Run("same min max", func(t *testing.T) {
-		out := renderLineChart("test", []float64{5.0, 5.0, 5.0}, 30, 5, "39")
+		out := renderLineChart("test", []float64{5.0, 5.0, 5.0}, 30, 5, lipgloss.Color("39"))
 		if out == "" {
 			t.Error("expected non-empty")
 		}
 	})
 	t.Run("varied data", func(t *testing.T) {
-		out := renderLineChart("test", []float64{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, 30, 5, "39")
+		out := renderLineChart("test", []float64{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, 30, 5, lipgloss.Color("39"))
 		if out == "" {
 			t.Error("expected non-empty")
 		}

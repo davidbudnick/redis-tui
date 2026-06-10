@@ -3,10 +3,10 @@ package ui
 import (
 	"github.com/davidbudnick/redis-tui/internal/types"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
-func (m Model) handleSearchValuesScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleSearchValuesScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		if m.Inputs.SearchValueInput.Value() != "" {
@@ -29,7 +29,7 @@ func (m Model) handleSearchValuesScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleRegexSearchScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleRegexSearchScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		if m.Inputs.RegexSearchInput.Value() != "" {
@@ -47,7 +47,7 @@ func (m Model) handleRegexSearchScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleFuzzySearchScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleFuzzySearchScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		if m.Inputs.FuzzySearchInput.Value() != "" {
@@ -65,7 +65,7 @@ func (m Model) handleFuzzySearchScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleCompareKeysScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleCompareKeysScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "tab":
 		if m.CompareFocusIdx == 0 {
@@ -100,7 +100,7 @@ func (m Model) handleCompareKeysScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleJSONPathScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleJSONPathScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		if m.Inputs.JSONPathInput.Value() != "" && m.CurrentKey != nil {

@@ -5,10 +5,10 @@ import (
 
 	"github.com/davidbudnick/redis-tui/internal/types"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
-func (m Model) handleHelpScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleHelpScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "enter", "?":
 		if m.CurrentConn != nil {
@@ -20,7 +20,7 @@ func (m Model) handleHelpScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleServerInfoScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleServerInfoScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "enter":
 		m.Screen = types.ScreenKeys
@@ -31,7 +31,7 @@ func (m Model) handleServerInfoScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handlePubSubScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handlePubSubScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "tab":
 		m.PubSubInput[m.PubSubFocusIdx].Blur()
@@ -57,11 +57,11 @@ func (m Model) handlePubSubScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handlePublishMessageScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handlePublishMessageScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m.handlePubSubScreen(msg)
 }
 
-func (m Model) handleSwitchDBScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleSwitchDBScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		dbNum, err := strconv.Atoi(m.Inputs.DBSwitchInput.Value())
@@ -82,7 +82,7 @@ func (m Model) handleSwitchDBScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleExportScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleExportScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		if m.Inputs.ExportInput.Value() != "" {
@@ -104,7 +104,7 @@ func (m Model) handleExportScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleImportScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleImportScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		if m.Inputs.ImportInput.Value() != "" {
@@ -122,7 +122,7 @@ func (m Model) handleImportScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleSlowLogScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleSlowLogScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "enter":
 		m.Screen = types.ScreenKeys
@@ -133,7 +133,7 @@ func (m Model) handleSlowLogScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleLuaScriptScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleLuaScriptScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		if m.Inputs.LuaScriptInput.Value() != "" {
@@ -151,7 +151,7 @@ func (m Model) handleLuaScriptScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleLogsScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleLogsScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.ShowingLogDetail {
 		switch msg.String() {
 		case "esc", "enter":
@@ -190,7 +190,7 @@ func (m Model) handleLogsScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleClientListScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleClientListScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":
 		if m.SelectedClientIdx > 0 {
@@ -209,7 +209,7 @@ func (m Model) handleClientListScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleMemoryStatsScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleMemoryStatsScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "r":
 		m.Loading = true
@@ -220,7 +220,7 @@ func (m Model) handleMemoryStatsScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleClusterInfoScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleClusterInfoScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":
 		if m.SelectedNodeIdx > 0 {
@@ -239,7 +239,7 @@ func (m Model) handleClusterInfoScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handlePubSubChannelsScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handlePubSubChannelsScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":
 		if m.SelectedChannelIdx > 0 {
@@ -261,7 +261,7 @@ func (m Model) handlePubSubChannelsScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleRedisConfigScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleRedisConfigScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.EditingConfigParam != "" {
 		switch msg.String() {
 		case "enter":
@@ -307,7 +307,7 @@ func (m Model) handleRedisConfigScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleLiveMetricsScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleLiveMetricsScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "c":
 		if m.LiveMetrics != nil {

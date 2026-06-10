@@ -5,7 +5,7 @@ import (
 
 	"github.com/davidbudnick/redis-tui/internal/types"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func (m Model) handleAutoConnectMsg(msg types.AutoConnectMsg) (tea.Model, tea.Cmd) {

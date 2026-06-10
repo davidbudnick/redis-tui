@@ -12,14 +12,14 @@ func TestView(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Width = 10
 		m.Height = 5
-		out := m.View()
+		out := m.View().Content
 		if !strings.Contains(out, "too small") {
 			t.Errorf("expected 'too small' in output")
 		}
 	})
 	t.Run("normal path connections", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		assertNonEmpty(t, "normal", m.View())
+		assertNonEmpty(t, "normal", m.View().Content)
 	})
 }
 
@@ -87,7 +87,7 @@ func TestGetScreenView_AllScreens(t *testing.T) {
 			m.CurrentKey = &types.RedisKey{Key: "foo", Type: types.KeyTypeString}
 			_ = m.getScreenView()
 			// Also exercise full View() which wraps getScreenView in layout.
-			_ = m.View()
+			_ = m.View().Content
 		})
 	}
 	t.Run("unknown screen returns empty", func(t *testing.T) {

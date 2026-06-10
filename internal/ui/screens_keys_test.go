@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/davidbudnick/redis-tui/internal/types"
 )
 
@@ -32,7 +32,7 @@ func TestHandleKeysScreen_Navigation(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		seedKeys(&m, 3)
 		m.SelectedKeyIdx = 2
-		result, _ := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyDown})
+		result, _ := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyDown})
 		model := result.(Model)
 		if model.SelectedKeyIdx != 2 {
 			t.Errorf("expected 2, got %d", model.SelectedKeyIdx)
@@ -54,13 +54,13 @@ func TestHandleKeysScreen_Navigation(t *testing.T) {
 	t.Run("up at top", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		seedKeys(&m, 3)
-		_, _ = m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyUp})
+		_, _ = m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyUp})
 	})
 	t.Run("pgup", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		seedKeys(&m, 20)
 		m.SelectedKeyIdx = 15
-		result, _ := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyPgUp})
+		result, _ := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyPgUp})
 		model := result.(Model)
 		if model.SelectedKeyIdx != 5 {
 			t.Errorf("expected 5, got %d", model.SelectedKeyIdx)
@@ -70,7 +70,7 @@ func TestHandleKeysScreen_Navigation(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		seedKeys(&m, 5)
 		m.SelectedKeyIdx = 3
-		result, _ := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyCtrlU})
+		result, _ := m.handleKeysScreen(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 		model := result.(Model)
 		if model.SelectedKeyIdx != 0 {
 			t.Errorf("expected 0, got %d", model.SelectedKeyIdx)
@@ -79,7 +79,7 @@ func TestHandleKeysScreen_Navigation(t *testing.T) {
 	t.Run("pgdown", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		seedKeys(&m, 20)
-		result, _ := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyPgDown})
+		result, _ := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyPgDown})
 		model := result.(Model)
 		if model.SelectedKeyIdx != 10 {
 			t.Errorf("expected 10, got %d", model.SelectedKeyIdx)
@@ -88,7 +88,7 @@ func TestHandleKeysScreen_Navigation(t *testing.T) {
 	t.Run("pgdown clamps", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		seedKeys(&m, 5)
-		result, _ := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyCtrlD})
+		result, _ := m.handleKeysScreen(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 		model := result.(Model)
 		if model.SelectedKeyIdx != 4 {
 			t.Errorf("expected 4, got %d", model.SelectedKeyIdx)
@@ -96,7 +96,7 @@ func TestHandleKeysScreen_Navigation(t *testing.T) {
 	})
 	t.Run("pgdown empty", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, cmd := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyPgDown})
+		_, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyPgDown})
 		if cmd != nil {
 			t.Error("expected nil cmd")
 		}
@@ -105,7 +105,7 @@ func TestHandleKeysScreen_Navigation(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		seedKeys(&m, 5)
 		m.SelectedKeyIdx = 3
-		result, _ := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyHome})
+		result, _ := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyHome})
 		model := result.(Model)
 		if model.SelectedKeyIdx != 0 {
 			t.Errorf("expected 0, got %d", model.SelectedKeyIdx)
@@ -119,7 +119,7 @@ func TestHandleKeysScreen_Navigation(t *testing.T) {
 	})
 	t.Run("home empty no-cmd", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, cmd := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyHome})
+		_, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyHome})
 		if cmd != nil {
 			t.Error("expected nil cmd")
 		}
@@ -127,7 +127,7 @@ func TestHandleKeysScreen_Navigation(t *testing.T) {
 	t.Run("end", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		seedKeys(&m, 5)
-		result, _ := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyEnd})
+		result, _ := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyEnd})
 		model := result.(Model)
 		if model.SelectedKeyIdx != 4 {
 			t.Errorf("expected 4, got %d", model.SelectedKeyIdx)
@@ -140,7 +140,7 @@ func TestHandleKeysScreen_Navigation(t *testing.T) {
 	})
 	t.Run("end empty", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, cmd := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyEnd})
+		_, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyEnd})
 		if cmd != nil {
 			t.Error("expected nil cmd")
 		}
@@ -151,14 +151,14 @@ func TestHandleKeysScreen_Actions(t *testing.T) {
 	t.Run("enter opens detail", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		seedKeys(&m, 3)
-		_, cmd := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected load value cmd")
 		}
 	})
 	t.Run("enter empty", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, cmd := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd != nil {
 			t.Error("expected nil cmd")
 		}
@@ -345,7 +345,7 @@ func TestHandleKeysScreen_Actions(t *testing.T) {
 	})
 	t.Run("ctrl+r regex", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyCtrlR})
+		result, _ := m.handleKeysScreen(tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 		model := result.(Model)
 		if model.Screen != types.ScreenRegexSearch {
 			t.Errorf("expected ScreenRegexSearch, got %v", model.Screen)
@@ -353,7 +353,7 @@ func TestHandleKeysScreen_Actions(t *testing.T) {
 	})
 	t.Run("ctrl+f fuzzy", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyCtrlF})
+		result, _ := m.handleKeysScreen(tea.KeyPressMsg{Code: 'f', Mod: tea.ModCtrl})
 		model := result.(Model)
 		if model.Screen != types.ScreenFuzzySearch {
 			t.Errorf("expected ScreenFuzzySearch, got %v", model.Screen)
@@ -361,7 +361,7 @@ func TestHandleKeysScreen_Actions(t *testing.T) {
 	})
 	t.Run("ctrl+l client list", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, cmd := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyCtrlL})
+		_, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: 'l', Mod: tea.ModCtrl})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -405,18 +405,18 @@ func TestHandleKeysScreen_Actions(t *testing.T) {
 	t.Run("ctrl+h recent", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.CurrentConn = &types.Connection{ID: 1}
-		_, cmd := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyCtrlH})
+		_, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: 'h', Mod: tea.ModCtrl})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
 	})
 	t.Run("ctrl+h recent nil conn", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyCtrlH})
+		_, _ = m.handleKeysScreen(tea.KeyPressMsg{Code: 'h', Mod: tea.ModCtrl})
 	})
 	t.Run("ctrl+e toggle keyspace on", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, cmd := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyCtrlE})
+		result, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: 'e', Mod: tea.ModCtrl})
 		model := result.(Model)
 		if !model.KeyspaceSubActive {
 			t.Error("expected KeyspaceSubActive")
@@ -429,12 +429,12 @@ func TestHandleKeysScreen_Actions(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		fn := func(tea.Msg) {}
 		m.SendFunc = &fn
-		_, _ = m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyCtrlE})
+		_, _ = m.handleKeysScreen(tea.KeyPressMsg{Code: 'e', Mod: tea.ModCtrl})
 	})
 	t.Run("ctrl+e toggle keyspace off", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.KeyspaceSubActive = true
-		result, _ := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyCtrlE})
+		result, _ := m.handleKeysScreen(tea.KeyPressMsg{Code: 'e', Mod: tea.ModCtrl})
 		model := result.(Model)
 		if model.KeyspaceSubActive {
 			t.Error("expected KeyspaceSubActive off")
@@ -449,7 +449,7 @@ func TestHandleKeysScreen_Actions(t *testing.T) {
 	})
 	t.Run("ctrl+g redis config", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, cmd := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyCtrlG})
+		_, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: 'g', Mod: tea.ModCtrl})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -461,7 +461,7 @@ func TestHandleKeysScreen_Actions(t *testing.T) {
 			{Key: "b", TTL: 500 * time.Second},
 			{Key: "c", TTL: 0},
 		}
-		result, _ := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyCtrlX})
+		result, _ := m.handleKeysScreen(tea.KeyPressMsg{Code: 'x', Mod: tea.ModCtrl})
 		model := result.(Model)
 		if len(model.ExpiringKeys) != 1 {
 			t.Errorf("expected 1 expiring, got %d", len(model.ExpiringKeys))
@@ -470,14 +470,14 @@ func TestHandleKeysScreen_Actions(t *testing.T) {
 	t.Run("esc clear pattern", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.KeyPattern = "foo"
-		_, cmd := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 		if cmd == nil {
 			t.Error("expected load cmd")
 		}
 	})
 	t.Run("esc exit", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		result, _ := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 		model := result.(Model)
 		if model.Screen != types.ScreenConnections {
 			t.Errorf("expected ScreenConnections, got %v", model.Screen)
@@ -490,7 +490,7 @@ func TestHandleKeysScreen_PatternInput(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Inputs.PatternInput.Focus()
 		m.Inputs.PatternInput.SetValue("user")
-		result, _ := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		result, _ := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		model := result.(Model)
 		if model.KeyPattern != "*user*" {
 			t.Errorf("expected *user*, got %q", model.KeyPattern)
@@ -500,7 +500,7 @@ func TestHandleKeysScreen_PatternInput(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Inputs.PatternInput.Focus()
 		m.Inputs.PatternInput.SetValue("user:*")
-		result, _ := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		result, _ := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		model := result.(Model)
 		if model.KeyPattern != "user:*" {
 			t.Errorf("expected user:*, got %q", model.KeyPattern)
@@ -509,7 +509,7 @@ func TestHandleKeysScreen_PatternInput(t *testing.T) {
 	t.Run("enter empty", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Inputs.PatternInput.Focus()
-		_, cmd := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected reload cmd")
 		}
@@ -518,7 +518,7 @@ func TestHandleKeysScreen_PatternInput(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Inputs.PatternInput.Focus()
 		m.Inputs.PatternInput.SetValue("foo")
-		_, cmd := m.handleKeysScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 		if cmd == nil {
 			t.Error("expected reload cmd")
 		}
@@ -769,7 +769,7 @@ func TestHandleKeyDetailScreen(t *testing.T) {
 	t.Run("up scroll detail", func(t *testing.T) {
 		m, _ := newModelWithKey(t, types.KeyTypeString)
 		m.DetailScroll = 3
-		result, _ := m.handleKeyDetailScreen(tea.KeyMsg{Type: tea.KeyUp})
+		result, _ := m.handleKeyDetailScreen(tea.KeyPressMsg{Code: tea.KeyUp})
 		model := result.(Model)
 		if model.DetailScroll != 2 {
 			t.Errorf("expected 2, got %d", model.DetailScroll)
@@ -791,16 +791,16 @@ func TestHandleKeyDetailScreen(t *testing.T) {
 	t.Run("pgup detail", func(t *testing.T) {
 		m, _ := newModelWithKey(t, types.KeyTypeString)
 		m.DetailScroll = 20
-		_, _ = m.handleKeyDetailScreen(tea.KeyMsg{Type: tea.KeyPgUp})
+		_, _ = m.handleKeyDetailScreen(tea.KeyPressMsg{Code: tea.KeyPgUp})
 	})
 	t.Run("pgdown detail", func(t *testing.T) {
 		m, _ := newModelWithKey(t, types.KeyTypeString)
-		_, _ = m.handleKeyDetailScreen(tea.KeyMsg{Type: tea.KeyPgDown})
+		_, _ = m.handleKeyDetailScreen(tea.KeyPressMsg{Code: tea.KeyPgDown})
 	})
 	t.Run("home detail", func(t *testing.T) {
 		m, _ := newModelWithKey(t, types.KeyTypeString)
 		m.DetailScroll = 5
-		result, _ := m.handleKeyDetailScreen(tea.KeyMsg{Type: tea.KeyHome})
+		result, _ := m.handleKeyDetailScreen(tea.KeyPressMsg{Code: tea.KeyHome})
 		model := result.(Model)
 		if model.DetailScroll != 0 {
 			t.Errorf("expected 0, got %d", model.DetailScroll)
@@ -812,7 +812,7 @@ func TestHandleKeyDetailScreen(t *testing.T) {
 	})
 	t.Run("end detail", func(t *testing.T) {
 		m, _ := newModelWithKey(t, types.KeyTypeString)
-		_, _ = m.handleKeyDetailScreen(tea.KeyMsg{Type: tea.KeyEnd})
+		_, _ = m.handleKeyDetailScreen(tea.KeyPressMsg{Code: tea.KeyEnd})
 	})
 	t.Run("G end", func(t *testing.T) {
 		m, _ := newModelWithKey(t, types.KeyTypeString)
@@ -820,7 +820,7 @@ func TestHandleKeyDetailScreen(t *testing.T) {
 	})
 	t.Run("esc exit", func(t *testing.T) {
 		m, _ := newModelWithKey(t, types.KeyTypeString)
-		result, _ := m.handleKeyDetailScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		result, _ := m.handleKeyDetailScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 		model := result.(Model)
 		if model.Screen != types.ScreenKeys {
 			t.Errorf("expected ScreenKeys, got %v", model.Screen)
@@ -832,14 +832,22 @@ func TestHandleKeyDetailScreen(t *testing.T) {
 }
 
 func TestCreateVimEditor(t *testing.T) {
-	// Test construction only — the inner command closures are covered via vim command dispatch in update_test.go.
 	ed := createVimEditor("hello", 80, 24, "f.txt")
 	if ed == nil {
 		t.Fatal("expected non-nil editor")
 	}
+	if ed.Value() != "hello" {
+		t.Errorf("expected content hello, got %q", ed.Value())
+	}
+	if ed.FileName() != "f.txt" {
+		t.Errorf("expected fileName f.txt, got %q", ed.FileName())
+	}
 	edNoFile := createVimEditor("content", 80, 24, "")
 	if edNoFile == nil {
 		t.Fatal("expected non-nil editor")
+	}
+	if edNoFile.FileName() != "" {
+		t.Errorf("expected empty fileName, got %q", edNoFile.FileName())
 	}
 }
 

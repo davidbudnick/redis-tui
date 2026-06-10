@@ -2,9 +2,10 @@ package ui
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 var (
@@ -208,7 +209,7 @@ func (m Model) viewLiveMetrics() string {
 }
 
 // renderLineChart creates a bar chart using block characters
-func renderLineChart(title string, data []float64, width, height int, color lipgloss.Color) string {
+func renderLineChart(title string, data []float64, width, height int, chartColor color.Color) string {
 	if len(data) == 0 {
 		return ""
 	}
@@ -236,7 +237,7 @@ func renderLineChart(title string, data []float64, width, height int, color lipg
 	current := data[len(data)-1]
 
 	// Title with current/max values
-	chartTitleStyle := lipgloss.NewStyle().Bold(true).Foreground(color)
+	chartTitleStyle := lipgloss.NewStyle().Bold(true).Foreground(chartColor)
 
 	b.WriteString(chartTitleStyle.Render(title))
 	b.WriteString(metricsCardLabel.Render(fmt.Sprintf("  %.1f", current)))
@@ -248,7 +249,7 @@ func renderLineChart(title string, data []float64, width, height int, color lipg
 
 	// Block characters for bar heights (from empty to full)
 	blocks := []rune{' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'}
-	chartStyle := lipgloss.NewStyle().Foreground(color)
+	chartStyle := lipgloss.NewStyle().Foreground(chartColor)
 
 	// Y-axis max label
 	maxLabel := fmt.Sprintf("%6.1f ", maxVal)
