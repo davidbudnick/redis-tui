@@ -41,7 +41,7 @@ go install github.com/davidbudnick/redis-tui@latest
 
 - **Key browser** with pattern filtering, regex, and fuzzy search
 - **All data types** — strings, lists, sets, sorted sets, hashes, streams, JSON (RedisJSON), HyperLogLog, bitmaps, and geospatial
-- **Inline editing** with VIM keybindings for strings and collections
+- **Inline value editor** for editing string and JSON values
 - **Tree view** for hierarchical key navigation
 - **Favorites and recent keys** for quick access
 - **Key templates** for creating keys from predefined structures
@@ -471,7 +471,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - [Lip Gloss](https://github.com/charmbracelet/lipgloss) - Styling library
 - [Bubbles](https://github.com/charmbracelet/bubbles) - TUI components
 - [go-redis](https://github.com/redis/go-redis) - Redis client
-- [vimtea](https://github.com/kujtimiihoxha/vimtea) - VIM editor component for inline editing
 - [miniredis](https://github.com/alicebob/miniredis) - In-memory Redis used in tests
 - [chroma](https://github.com/alecthomas/chroma) - Syntax highlighting for JSON values
 

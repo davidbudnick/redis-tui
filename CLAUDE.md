@@ -37,7 +37,7 @@ internal/
 
 ## Code Conventions
 
-- **Go version**: 1.26 (set in go.mod)
+- **Go version**: 1.26.4 (set in go.mod)
 - **Package names**: lowercase, single word (`cmd`, `redis`, `types`, `db`, `ui`)
 - **Receivers**: short names (`c *Client`, `m Model`, `cfg *Config`)
 - **Message types**: PascalCase with `Msg` suffix (`ConnectedMsg`, `KeysLoadedMsg`)
@@ -69,11 +69,10 @@ internal/
 
 ## Key Dependencies
 
-- `charmbracelet/bubbletea` — TUI framework
-- `charmbracelet/bubbles` — TUI components
-- `charmbracelet/lipgloss` — Terminal styling
+- `charm.land/bubbletea/v2` — TUI framework
+- `charm.land/bubbles/v2` — TUI components
+- `charm.land/lipgloss/v2` — Terminal styling
 - `redis/go-redis/v9` — Redis client
-- `kujtimiihoxha/vimtea` — VIM editor component
 - `alicebob/miniredis/v2` — In-memory Redis for tests
 - `alecthomas/chroma/v2` — Syntax highlighting
 

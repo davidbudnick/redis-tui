@@ -365,10 +365,10 @@ type UpdateAvailableMsg struct {
 	Err           error
 }
 
-// EditorSaveMsg is sent when user saves in vim editor (:w)
+// EditorSaveMsg is sent when the user saves in the value editor (Ctrl+S)
 type EditorSaveMsg struct {
 	Content string
 }
 
-// EditorQuitMsg is sent when user quits vim editor (:q)
+// EditorQuitMsg is sent when the user cancels the value editor (Esc)
 type EditorQuitMsg struct{}
