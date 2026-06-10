@@ -3,7 +3,7 @@ package cmd
 import (
 	"github.com/davidbudnick/redis-tui/internal/types"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func (c *Commands) LoadFavorites(connID int64) tea.Cmd {

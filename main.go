@@ -15,7 +15,7 @@ import (
 	"github.com/davidbudnick/redis-tui/internal/types"
 	"github.com/davidbudnick/redis-tui/internal/ui"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 var (
@@ -34,7 +34,7 @@ var (
 func prodLogFatal(v ...any) { log.Fatal(v...) }
 
 func prodRunApp(m ui.Model) error {
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(m)
 	*m.SendFunc = p.Send
 	_, err := p.Run()
 	return err

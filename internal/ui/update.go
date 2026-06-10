@@ -5,9 +5,8 @@ import (
 	"time"
 
 	"github.com/davidbudnick/redis-tui/internal/types"
-	"github.com/kujtimiihoxha/vimtea"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -15,14 +14,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
-		// Resize vimtea editor if active
 		if m.Screen == types.ScreenEditValue && m.VimEditor != nil {
-			sized, _ := m.VimEditor.SetSize(msg.Width-4, msg.Height-10)
-			m.VimEditor = sized.(vimtea.Editor)
+			m.VimEditor.SetSize(msg.Width-4, msg.Height-10)
 		}
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		return m.handleKeyPress(msg)
 
 	case types.SearchDebounceMsg:
@@ -177,7 +174,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	// Editor messages (from vimtea :w/:q commands)
+	// Editor messages (from save/cancel keys)
 	case types.EditorSaveMsg:
 		if m.CurrentKey != nil {
 			m.Loading = true
@@ -191,10 +188,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	default:
-		// Pass unhandled messages to vimtea editor if active
 		if m.Screen == types.ScreenEditValue && m.VimEditor != nil {
 			updated, editorCmd := m.VimEditor.Update(msg)
-			m.VimEditor = updated.(vimtea.Editor)
+			m.VimEditor = updated
 			return m, editorCmd
 		}
 	}
@@ -260,7 +256,7 @@ func tickCmd() tea.Cmd {
 	})
 }
 
-func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "ctrl+c":
 		return m, tea.Quit

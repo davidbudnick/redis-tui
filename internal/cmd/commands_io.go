@@ -8,7 +8,7 @@ import (
 
 	"github.com/davidbudnick/redis-tui/internal/types"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 func (c *Commands) ExportKeys(pattern, filename string) tea.Cmd {

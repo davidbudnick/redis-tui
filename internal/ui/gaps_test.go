@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/davidbudnick/redis-tui/internal/types"
-	"github.com/kujtimiihoxha/vimtea"
 )
 
 // ---- Init CLIConnection closure body ----
@@ -76,10 +76,10 @@ func TestHandleAddConnectionScreen_ClusterFocusOverflow(t *testing.T) {
 	// First toggle cluster on at idx 4 scenario: manually create a state where
 	// after toggling, focus idx >= connFieldCount
 	m.ConnFocusIdx = 5
-	_, _ = m.handleAddConnectionScreen(tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}})
+	_, _ = m.handleAddConnectionScreen(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
 	// Now cluster is on — re-toggle with focus still valid
 	m.ConnClusterMode = true // m is a val, not a pointer, so we need to manually flip
-	_, _ = m.handleAddConnectionScreen(tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}})
+	_, _ = m.handleAddConnectionScreen(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
 }
 
 // ---- updateConnInputs returns nil when focus is on cluster toggle ----
@@ -111,7 +111,7 @@ func TestUpdateConnInputs_NotCluster(t *testing.T) {
 func TestHandleEditConnectionScreen_ClusterFocusOverflow(t *testing.T) {
 	m, _, _ := newTestModel(t)
 	m.ConnFocusIdx = 4
-	_, _ = m.handleEditConnectionScreen(tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}})
+	_, _ = m.handleEditConnectionScreen(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
 }
 
 // ---- handleAddKeyScreen ctrl+t focus adjust when shrinking ----
@@ -121,7 +121,7 @@ func TestHandleAddKeyScreen_CtrlTShrinkFocus(t *testing.T) {
 	m.AddKeyType = types.KeyTypeGeo // 3 fields
 	m.AddKeyFocusIdx = 2
 	// Cycle to the next type (String - 2 fields) — should shrink focus
-	_, _ = m.handleAddKeyScreen(tea.KeyMsg{Type: tea.KeyCtrlT})
+	_, _ = m.handleAddKeyScreen(tea.KeyPressMsg{Code: 't', Mod: tea.ModCtrl})
 	// Need to loop around: actually geo -> string. String has 2 fields, so focus idx 2 becomes 1.
 }
 
@@ -235,7 +235,7 @@ func TestViewLiveMetrics_SmallSeparator(t *testing.T) {
 func TestRenderLineChart_ExtremeValues(t *testing.T) {
 	// Craft data where normalized * height * 8 can land exactly at or above fullRowsBelow+7
 	data := []float64{0, 1, 2, 100, 1, 2, 0}
-	out := renderLineChart("t", data, 20, 3, "39")
+	out := renderLineChart("t", data, 20, 3, lipgloss.Color("39"))
 	if out == "" {
 		t.Error("expected non-empty")
 	}
@@ -317,7 +317,7 @@ func TestHandleKeyDetailScreen_ScrollClamp(t *testing.T) {
 	m.CurrentValue = types.RedisValue{Type: types.KeyTypeString, StringValue: "single line"}
 	m.DetailScroll = 100
 	_, _ = m.handleKeyDetailScreen(keyMsg('j'))
-	_, _ = m.handleKeyDetailScreen(tea.KeyMsg{Type: tea.KeyPgDown})
+	_, _ = m.handleKeyDetailScreen(tea.KeyPressMsg{Code: tea.KeyPgDown})
 }
 
 // ---- handleKeyDetailScreen pgup negative clamp ----
@@ -326,7 +326,7 @@ func TestHandleKeyDetailScreen_PgUpClamp(t *testing.T) {
 	m, _, _ := newTestModel(t)
 	m.CurrentKey = &types.RedisKey{Key: "foo", Type: types.KeyTypeString}
 	m.DetailScroll = 3 // pgup -10 → -7 → clamp to 0
-	result, _ := m.handleKeyDetailScreen(tea.KeyMsg{Type: tea.KeyPgUp})
+	result, _ := m.handleKeyDetailScreen(tea.KeyPressMsg{Code: tea.KeyPgUp})
 	if result.(Model).DetailScroll != 0 {
 		t.Errorf("expected 0, got %d", result.(Model).DetailScroll)
 	}
@@ -365,7 +365,7 @@ func TestFormatPreviewValue_HashVeryNarrow(t *testing.T) {
 // ---- renderLineChart with values where a later value is smaller (min found later) ----
 
 func TestRenderLineChart_MinFoundLater(t *testing.T) {
-	out := renderLineChart("t", []float64{5, 3, 10, 1, 8}, 20, 4, "39")
+	out := renderLineChart("t", []float64{5, 3, 10, 1, 8}, 20, 4, lipgloss.Color("39"))
 	if out == "" {
 		t.Error("expected non-empty")
 	}
@@ -428,30 +428,35 @@ func TestHandleKeysScreen_DebounceClosureFires(t *testing.T) {
 	}
 }
 
-// ---- createVimEditor :w :q :wq command closures via CommandMsg ----
-
-func TestCreateVimEditor_CommandClosures(t *testing.T) {
-	// Drive vimtea via its CommandMsg to invoke the registered :w, :q, :wq callbacks.
-	// This directly triggers the closure bodies inside createVimEditor.
+func TestCreateVimEditor_SaveCancel(t *testing.T) {
 	cases := []struct {
-		cmd          string
+		key          tea.KeyPressMsg
 		expectedType any
 	}{
-		{"w", types.EditorSaveMsg{}},
-		{"q", types.EditorQuitMsg{}},
-		{"wq", types.EditorSaveMsg{}},
+		{tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl}, types.EditorSaveMsg{}},
+		{tea.KeyPressMsg{Code: tea.KeyEsc}, types.EditorQuitMsg{}},
+		{tea.KeyPressMsg{Code: 'q', Mod: tea.ModCtrl}, types.EditorQuitMsg{}},
 	}
 	for _, tc := range cases {
 		ed := createVimEditor("hello", 80, 24, "f.txt")
-		_, cmd := ed.Update(vimtea.CommandMsg{Command: tc.cmd})
+		_, cmd := ed.Update(tc.key)
 		if cmd == nil {
-			t.Errorf("%s: expected cmd", tc.cmd)
-			continue
+			t.Fatalf("%v: expected cmd", tc.key)
 		}
-		// Invoke the cmd to execute the closure body
 		msg := cmd()
-		if msg == nil {
-			t.Errorf("%s: expected non-nil msg", tc.cmd)
+		switch tc.expectedType.(type) {
+		case types.EditorSaveMsg:
+			save, ok := msg.(types.EditorSaveMsg)
+			if !ok {
+				t.Fatalf("%v: expected EditorSaveMsg, got %T", tc.key, msg)
+			}
+			if save.Content != "hello" {
+				t.Errorf("%v: expected content hello, got %q", tc.key, save.Content)
+			}
+		case types.EditorQuitMsg:
+			if _, ok := msg.(types.EditorQuitMsg); !ok {
+				t.Fatalf("%v: expected EditorQuitMsg, got %T", tc.key, msg)
+			}
 		}
 	}
 }

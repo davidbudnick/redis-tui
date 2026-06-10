@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/davidbudnick/redis-tui/internal/types"
 )
 
@@ -27,7 +27,7 @@ func TestUpdate_WindowSizeMsg(t *testing.T) {
 
 func TestUpdate_KeyMsg(t *testing.T) {
 	m, _, _ := newTestModel(t)
-	_, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	_, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 }
 
 func TestUpdate_SearchDebounceMsg(t *testing.T) {
@@ -285,7 +285,7 @@ func TestTickCmd_InnerClosure(t *testing.T) {
 func TestHandleKeyPress_GlobalKeys(t *testing.T) {
 	t.Run("ctrl+c quits", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, cmd := m.handleKeyPress(tea.KeyMsg{Type: tea.KeyCtrlC})
+		_, cmd := m.handleKeyPress(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
 		if cmd == nil {
 			t.Error("expected quit cmd")
 		}
@@ -353,7 +353,7 @@ func TestHandleKeyPress_AllScreens(t *testing.T) {
 		t.Run(s.String(), func(t *testing.T) {
 			m, _, _ := newTestModel(t)
 			m.Screen = s
-			_, _ = m.handleKeyPress(tea.KeyMsg{Type: tea.KeyEsc})
+			_, _ = m.handleKeyPress(tea.KeyPressMsg{Code: tea.KeyEsc})
 		})
 	}
 }

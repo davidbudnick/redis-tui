@@ -3,10 +3,10 @@ package ui
 import (
 	"github.com/davidbudnick/redis-tui/internal/types"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
-func (m Model) handleConnectionsScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleConnectionsScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":
 		if m.SelectedConnIdx > 0 {
@@ -50,7 +50,7 @@ func (m Model) handleConnectionsScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleAddConnectionScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleAddConnectionScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	fieldCount := m.connFieldCount()
 
 	switch msg.String() {
@@ -65,7 +65,7 @@ func (m Model) handleAddConnectionScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.ConnFocusIdx = fieldCount - 1
 		}
 		m.focusConnField()
-	case " ":
+	case "space":
 		if m.ConnFocusIdx == 5 {
 			m.ConnClusterMode = !m.ConnClusterMode
 			return m, nil
@@ -126,7 +126,7 @@ func (m *Model) focusConnField() {
 	}
 }
 
-func (m Model) updateConnInputs(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateConnInputs(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Only update the focused text input, not the cluster toggle
 	idx := connInputIndex(m.ConnFocusIdx)
 	if idx >= 0 && idx < len(m.ConnInputs) {
@@ -137,7 +137,7 @@ func (m Model) updateConnInputs(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleEditConnectionScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleEditConnectionScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	fieldCount := m.connFieldCount()
 
 	switch msg.String() {
@@ -152,7 +152,7 @@ func (m Model) handleEditConnectionScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.ConnFocusIdx = fieldCount - 1
 		}
 		m.focusConnField()
-	case " ":
+	case "space":
 		if m.ConnFocusIdx == 5 {
 			m.ConnClusterMode = !m.ConnClusterMode
 			return m, nil
@@ -180,7 +180,7 @@ func (m Model) handleEditConnectionScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleTestConnectionScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleTestConnectionScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "enter":
 		m.Screen = types.ScreenAddConnection

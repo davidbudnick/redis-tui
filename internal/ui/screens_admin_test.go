@@ -3,7 +3,7 @@ package ui
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/davidbudnick/redis-tui/internal/types"
 )
 
@@ -22,7 +22,7 @@ func TestHandleHelpScreen(t *testing.T) {
 			if tt.hasConn {
 				m.CurrentConn = &types.Connection{ID: 1}
 			}
-			result, _ := m.handleHelpScreen(tea.KeyMsg{Type: tea.KeyEsc})
+			result, _ := m.handleHelpScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 			if result.(Model).Screen != tt.want {
 				t.Errorf("expected %v, got %v", tt.want, result.(Model).Screen)
 			}
@@ -30,7 +30,7 @@ func TestHandleHelpScreen(t *testing.T) {
 	}
 	t.Run("enter and ? also exit", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleHelpScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, _ = m.handleHelpScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		_, _ = m.handleHelpScreen(keyMsg('?'))
 	})
 	t.Run("other key no-op", func(t *testing.T) {
@@ -42,14 +42,14 @@ func TestHandleHelpScreen(t *testing.T) {
 func TestHandleServerInfoScreen(t *testing.T) {
 	t.Run("esc exits", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleServerInfoScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		result, _ := m.handleServerInfoScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 		if result.(Model).Screen != types.ScreenKeys {
 			t.Errorf("expected ScreenKeys, got %v", result.(Model).Screen)
 		}
 	})
 	t.Run("enter exits", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleServerInfoScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, _ = m.handleServerInfoScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 	})
 	t.Run("r reloads", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
@@ -67,7 +67,7 @@ func TestHandleServerInfoScreen(t *testing.T) {
 func TestHandlePubSubScreen(t *testing.T) {
 	t.Run("tab advances focus", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handlePubSubScreen(tea.KeyMsg{Type: tea.KeyTab})
+		result, _ := m.handlePubSubScreen(tea.KeyPressMsg{Code: tea.KeyTab})
 		if result.(Model).PubSubFocusIdx != 1 {
 			t.Errorf("expected 1, got %d", result.(Model).PubSubFocusIdx)
 		}
@@ -76,21 +76,21 @@ func TestHandlePubSubScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.PubSubInput[0].SetValue("ch")
 		m.PubSubInput[1].SetValue("msg")
-		_, cmd := m.handlePubSubScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handlePubSubScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected publish cmd")
 		}
 	})
 	t.Run("enter no-op empty", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, cmd := m.handlePubSubScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handlePubSubScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd != nil {
 			t.Error("expected nil cmd")
 		}
 	})
 	t.Run("esc exits", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handlePubSubScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		result, _ := m.handlePubSubScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 		if result.(Model).Screen != types.ScreenPubSubChannels {
 			t.Errorf("expected ScreenPubSubChannels, got %v", result.(Model).Screen)
 		}
@@ -103,14 +103,14 @@ func TestHandlePubSubScreen(t *testing.T) {
 
 func TestHandlePublishMessageScreen(t *testing.T) {
 	m, _, _ := newTestModel(t)
-	_, _ = m.handlePublishMessageScreen(tea.KeyMsg{Type: tea.KeyTab})
+	_, _ = m.handlePublishMessageScreen(tea.KeyPressMsg{Code: tea.KeyTab})
 }
 
 func TestHandleSwitchDBScreen(t *testing.T) {
 	t.Run("enter valid db", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Inputs.DBSwitchInput.SetValue("5")
-		_, cmd := m.handleSwitchDBScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleSwitchDBScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected switch cmd")
 		}
@@ -118,7 +118,7 @@ func TestHandleSwitchDBScreen(t *testing.T) {
 	t.Run("enter invalid db", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Inputs.DBSwitchInput.SetValue("not-a-number")
-		result, _ := m.handleSwitchDBScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		result, _ := m.handleSwitchDBScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if result.(Model).StatusMsg == "" {
 			t.Error("expected error status")
 		}
@@ -126,14 +126,14 @@ func TestHandleSwitchDBScreen(t *testing.T) {
 	t.Run("enter out of range", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Inputs.DBSwitchInput.SetValue("20")
-		result, _ := m.handleSwitchDBScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		result, _ := m.handleSwitchDBScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if result.(Model).StatusMsg == "" {
 			t.Error("expected error status")
 		}
 	})
 	t.Run("esc exits", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleSwitchDBScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		result, _ := m.handleSwitchDBScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 		if result.(Model).Screen != types.ScreenKeys {
 			t.Errorf("expected ScreenKeys, got %v", result.(Model).Screen)
 		}
@@ -149,7 +149,7 @@ func TestHandleExportScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Inputs.ExportInput.SetValue("out.json")
 		m.KeyPattern = "user:*"
-		_, cmd := m.handleExportScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleExportScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected export cmd")
 		}
@@ -157,21 +157,21 @@ func TestHandleExportScreen(t *testing.T) {
 	t.Run("enter exports empty pattern", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Inputs.ExportInput.SetValue("out.json")
-		_, cmd := m.handleExportScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleExportScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected export cmd")
 		}
 	})
 	t.Run("enter empty filename", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, cmd := m.handleExportScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleExportScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd != nil {
 			t.Error("expected nil cmd")
 		}
 	})
 	t.Run("esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleExportScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		result, _ := m.handleExportScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 		if result.(Model).Screen != types.ScreenKeys {
 			t.Errorf("expected ScreenKeys, got %v", result.(Model).Screen)
 		}
@@ -186,21 +186,21 @@ func TestHandleImportScreen(t *testing.T) {
 	t.Run("enter imports", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Inputs.ImportInput.SetValue("in.json")
-		_, cmd := m.handleImportScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleImportScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected import cmd")
 		}
 	})
 	t.Run("enter empty", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, cmd := m.handleImportScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleImportScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd != nil {
 			t.Error("expected nil cmd")
 		}
 	})
 	t.Run("esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleImportScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleImportScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 	t.Run("default input", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
@@ -211,11 +211,11 @@ func TestHandleImportScreen(t *testing.T) {
 func TestHandleSlowLogScreen(t *testing.T) {
 	t.Run("esc exits", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleSlowLogScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleSlowLogScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 	t.Run("enter exits", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleSlowLogScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, _ = m.handleSlowLogScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 	})
 	t.Run("r reloads", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
@@ -230,21 +230,21 @@ func TestHandleLuaScriptScreen(t *testing.T) {
 	t.Run("enter runs script", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Inputs.LuaScriptInput.SetValue("return 1")
-		_, cmd := m.handleLuaScriptScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleLuaScriptScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected eval cmd")
 		}
 	})
 	t.Run("enter empty", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, cmd := m.handleLuaScriptScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleLuaScriptScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd != nil {
 			t.Error("expected nil cmd")
 		}
 	})
 	t.Run("esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleLuaScriptScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleLuaScriptScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 	t.Run("default input", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
@@ -256,7 +256,7 @@ func TestHandleLogsScreen(t *testing.T) {
 	t.Run("showing detail esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.ShowingLogDetail = true
-		result, _ := m.handleLogsScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		result, _ := m.handleLogsScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 		if result.(Model).ShowingLogDetail {
 			t.Error("expected ShowingLogDetail=false")
 		}
@@ -264,11 +264,11 @@ func TestHandleLogsScreen(t *testing.T) {
 	t.Run("showing detail enter", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.ShowingLogDetail = true
-		_, _ = m.handleLogsScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, _ = m.handleLogsScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 	})
 	t.Run("esc exits", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleLogsScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		result, _ := m.handleLogsScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 		if result.(Model).Screen != types.ScreenKeys {
 			t.Errorf("expected ScreenKeys, got %v", result.(Model).Screen)
 		}
@@ -291,14 +291,14 @@ func TestHandleLogsScreen(t *testing.T) {
 		if _, err := m.Logs.Write([]byte("hello\n")); err != nil {
 			t.Fatalf("write failed: %v", err)
 		}
-		result, _ := m.handleLogsScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		result, _ := m.handleLogsScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if !result.(Model).ShowingLogDetail {
 			t.Error("expected ShowingLogDetail=true")
 		}
 	})
 	t.Run("enter no logs", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleLogsScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, _ = m.handleLogsScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 	})
 	t.Run("g home", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
@@ -342,7 +342,7 @@ func TestHandleClientListScreen(t *testing.T) {
 	})
 	t.Run("esc exits", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleClientListScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleClientListScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 }
 
@@ -356,7 +356,7 @@ func TestHandleMemoryStatsScreen(t *testing.T) {
 	})
 	t.Run("esc exits", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleMemoryStatsScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleMemoryStatsScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 }
 
@@ -380,7 +380,7 @@ func TestHandleClusterInfoScreen(t *testing.T) {
 	})
 	t.Run("esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleClusterInfoScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleClusterInfoScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 }
 
@@ -411,7 +411,7 @@ func TestHandlePubSubChannelsScreen(t *testing.T) {
 	})
 	t.Run("esc", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handlePubSubChannelsScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handlePubSubChannelsScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 }
 
@@ -420,7 +420,7 @@ func TestHandleRedisConfigScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.EditingConfigParam = "maxmemory"
 		m.Inputs.ConfigEditInput.SetValue("100mb")
-		_, cmd := m.handleRedisConfigScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleRedisConfigScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected cmd")
 		}
@@ -428,7 +428,7 @@ func TestHandleRedisConfigScreen(t *testing.T) {
 	t.Run("editing esc cancels", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.EditingConfigParam = "maxmemory"
-		result, _ := m.handleRedisConfigScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		result, _ := m.handleRedisConfigScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 		if result.(Model).EditingConfigParam != "" {
 			t.Error("expected editing cleared")
 		}
@@ -469,7 +469,7 @@ func TestHandleRedisConfigScreen(t *testing.T) {
 	})
 	t.Run("esc exits", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleRedisConfigScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		result, _ := m.handleRedisConfigScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 		if result.(Model).Screen != types.ScreenKeys {
 			t.Errorf("expected ScreenKeys, got %v", result.(Model).Screen)
 		}
@@ -499,6 +499,6 @@ func TestHandleLiveMetricsScreen(t *testing.T) {
 	})
 	t.Run("esc exits", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleLiveMetricsScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		_, _ = m.handleLiveMetricsScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 	})
 }

@@ -3,7 +3,8 @@ package ui
 import (
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/davidbudnick/redis-tui/internal/types"
 )
 
@@ -102,7 +103,13 @@ func (m Model) getScreenView() string {
 	}
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
+	v := tea.NewView(m.render())
+	v.AltScreen = true
+	return v
+}
+
+func (m Model) render() string {
 	if m.Width < 50 || m.Height < 15 {
 		return lipgloss.Place(m.Width, m.Height, lipgloss.Center, lipgloss.Center,
 			"Terminal too small.\nResize to at least 50x15.")

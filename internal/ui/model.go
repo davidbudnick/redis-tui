@@ -4,12 +4,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/charmbracelet/bubbles/textinput"
+	"charm.land/bubbles/v2/textinput"
 	"github.com/davidbudnick/redis-tui/internal/cmd"
 	"github.com/davidbudnick/redis-tui/internal/types"
-	"github.com/kujtimiihoxha/vimtea"
+	"github.com/davidbudnick/redis-tui/internal/ui/editor"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 type Model struct {
@@ -47,7 +47,7 @@ type Model struct {
 	PendingSelectKey  string
 
 	// New fields for additional features
-	VimEditor          vimtea.Editor
+	VimEditor          *editor.Model
 	EditingIndex       int
 	EditingField       string
 	AddCollectionInput []textinput.Model
@@ -253,7 +253,7 @@ func NewModel() Model {
 func createTextInput(placeholder string, width int) textinput.Model {
 	ti := textinput.New()
 	ti.Placeholder = placeholder
-	ti.Width = width
+	ti.SetWidth(width)
 	return ti
 }
 
@@ -263,31 +263,31 @@ func createConnectionInputs() []textinput.Model {
 	inputs[0] = textinput.New()
 	inputs[0].Placeholder = "Connection Name"
 	inputs[0].Focus()
-	inputs[0].Width = 30
+	inputs[0].SetWidth(30)
 
 	inputs[1] = textinput.New()
 	inputs[1].Placeholder = "Host"
-	inputs[1].Width = 30
+	inputs[1].SetWidth(30)
 	inputs[1].SetValue("localhost")
 
 	inputs[2] = textinput.New()
 	inputs[2].Placeholder = "Port"
-	inputs[2].Width = 30
+	inputs[2].SetWidth(30)
 	inputs[2].SetValue("6379")
 
 	inputs[3] = textinput.New()
 	inputs[3].Placeholder = "Username (optional)"
-	inputs[3].Width = 30
+	inputs[3].SetWidth(30)
 	inputs[3].SetValue("default")
 
 	inputs[4] = textinput.New()
 	inputs[4].Placeholder = "Password (optional)"
-	inputs[4].Width = 30
+	inputs[4].SetWidth(30)
 	inputs[4].EchoMode = textinput.EchoPassword
 
 	inputs[5] = textinput.New()
 	inputs[5].Placeholder = "Database (0-15)"
-	inputs[5].Width = 30
+	inputs[5].SetWidth(30)
 	inputs[5].SetValue("0")
 
 	return inputs
@@ -299,16 +299,16 @@ func createAddKeyInputs() []textinput.Model {
 	inputs[0] = textinput.New()
 	inputs[0].Placeholder = "Key Name"
 	inputs[0].Focus()
-	inputs[0].Width = 30
+	inputs[0].SetWidth(30)
 
 	inputs[1] = textinput.New()
 	inputs[1].Placeholder = "Value"
-	inputs[1].Width = 30
+	inputs[1].SetWidth(30)
 
 	// Third input: Field name (hash/stream) or Score (zset)
 	inputs[2] = textinput.New()
 	inputs[2].Placeholder = "Field"
-	inputs[2].Width = 30
+	inputs[2].SetWidth(30)
 
 	return inputs
 }
@@ -319,11 +319,11 @@ func createAddCollectionInputs() []textinput.Model {
 	inputs[0] = textinput.New()
 	inputs[0].Placeholder = "Field/Member"
 	inputs[0].Focus()
-	inputs[0].Width = 30
+	inputs[0].SetWidth(30)
 
 	inputs[1] = textinput.New()
 	inputs[1].Placeholder = "Value/Score"
-	inputs[1].Width = 30
+	inputs[1].SetWidth(30)
 
 	return inputs
 }
@@ -334,11 +334,11 @@ func createPubSubInputs() []textinput.Model {
 	inputs[0] = textinput.New()
 	inputs[0].Placeholder = "Channel"
 	inputs[0].Focus()
-	inputs[0].Width = 30
+	inputs[0].SetWidth(30)
 
 	inputs[1] = textinput.New()
 	inputs[1].Placeholder = "Message"
-	inputs[1].Width = 30
+	inputs[1].SetWidth(30)
 
 	return inputs
 }
@@ -347,7 +347,6 @@ func (m Model) Init() tea.Cmd {
 	cmds := []tea.Cmd{
 		m.Cmds.LoadConnections(),
 		m.Cmds.CheckVersion(m.Version),
-		func() tea.Msg { return tea.EnableBracketedPaste() },
 		tickCmd(),
 	}
 	if m.CLIConnection != nil {

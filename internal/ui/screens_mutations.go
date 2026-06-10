@@ -7,9 +7,8 @@ import (
 	"time"
 
 	"github.com/davidbudnick/redis-tui/internal/types"
-	"github.com/kujtimiihoxha/vimtea"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // addKeyFieldCount returns the number of focusable fields for the current add key type.
@@ -23,7 +22,7 @@ func (m Model) addKeyFieldCount() int {
 	}
 }
 
-func (m Model) handleAddKeyScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleAddKeyScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	fieldCount := m.addKeyFieldCount()
 	switch msg.String() {
 	case "tab":
@@ -86,7 +85,7 @@ func (m Model) handleAddKeyScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleConfirmDeleteScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleConfirmDeleteScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "y", "Y", "enter":
 		m.Loading = true
@@ -119,7 +118,7 @@ func (m Model) handleConfirmDeleteScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleTTLEditorScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleTTLEditorScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		if m.CurrentKey != nil {
@@ -143,13 +142,12 @@ func (m Model) handleTTLEditorScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleEditValueScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Handle save (ctrl+s) and quit (ctrl+q) globally
+func (m Model) handleEditValueScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "ctrl+s":
 		if m.CurrentKey != nil {
 			m.Loading = true
-			content := m.VimEditor.GetBuffer().Text()
+			content := m.VimEditor.Value()
 			if m.CurrentKey.Type == types.KeyTypeJSON {
 				return m, m.Cmds.EditJSONValue(m.CurrentKey.Key, content)
 			}
@@ -160,16 +158,15 @@ func (m Model) handleEditValueScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Delegate everything else to vimtea
 	if m.VimEditor != nil {
 		updated, editorCmd := m.VimEditor.Update(msg)
-		m.VimEditor = updated.(vimtea.Editor)
+		m.VimEditor = updated
 		return m, editorCmd
 	}
 	return m, nil
 }
 
-func (m Model) handleAddToCollectionScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleAddToCollectionScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "tab":
 		m.AddCollectionInput[m.AddCollFocusIdx].Blur()
@@ -265,7 +262,7 @@ func (m Model) handleAddToCollectionScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	return m, nil
 }
 
-func (m Model) handleRemoveFromCollectionScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleRemoveFromCollectionScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "up", "k":
 		if m.SelectedItemIdx > 0 {
@@ -317,7 +314,7 @@ func (m Model) handleRemoveFromCollectionScreen(msg tea.KeyMsg) (tea.Model, tea.
 	return m, nil
 }
 
-func (m Model) handleRenameKeyScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleRenameKeyScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		if m.CurrentKey != nil && m.Inputs.RenameInput.Value() != "" && m.Inputs.RenameInput.Value() != m.CurrentKey.Key {
@@ -335,7 +332,7 @@ func (m Model) handleRenameKeyScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleCopyKeyScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleCopyKeyScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		if m.CurrentKey != nil && m.Inputs.CopyInput.Value() != "" {
@@ -353,7 +350,7 @@ func (m Model) handleCopyKeyScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleBulkDeleteScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleBulkDeleteScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		if m.Inputs.BulkDeleteInput.Value() != "" {
@@ -371,7 +368,7 @@ func (m Model) handleBulkDeleteScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleBatchTTLScreen(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleBatchTTLScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "tab":
 		if m.Inputs.BatchTTLInput.Focused() {

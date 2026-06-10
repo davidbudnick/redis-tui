@@ -3,13 +3,13 @@ package ui
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/davidbudnick/redis-tui/internal/types"
 )
 
-// keyMsg constructs a tea.KeyMsg for a single rune like 'a', 'j', etc.
-func keyMsg(r rune) tea.KeyMsg {
-	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}}
+// keyMsg constructs a tea.KeyPressMsg for a single rune like 'a', 'j', etc.
+func keyMsg(r rune) tea.KeyPressMsg {
+	return tea.KeyPressMsg{Code: r, Text: string(r)}
 }
 
 func TestHandleConnectionsScreen(t *testing.T) {
@@ -31,7 +31,7 @@ func TestHandleConnectionsScreen(t *testing.T) {
 	t.Run("down key arrow", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Connections = connList
-		result, _ := m.handleConnectionsScreen(tea.KeyMsg{Type: tea.KeyDown})
+		result, _ := m.handleConnectionsScreen(tea.KeyPressMsg{Code: tea.KeyDown})
 		model := result.(Model)
 		if model.SelectedConnIdx != 1 {
 			t.Errorf("expected SelectedConnIdx=1, got %d", model.SelectedConnIdx)
@@ -50,7 +50,7 @@ func TestHandleConnectionsScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Connections = connList
 		m.SelectedConnIdx = 2
-		result, _ := m.handleConnectionsScreen(tea.KeyMsg{Type: tea.KeyUp})
+		result, _ := m.handleConnectionsScreen(tea.KeyPressMsg{Code: tea.KeyUp})
 		model := result.(Model)
 		if model.SelectedConnIdx != 1 {
 			t.Errorf("expected SelectedConnIdx=1, got %d", model.SelectedConnIdx)
@@ -59,7 +59,7 @@ func TestHandleConnectionsScreen(t *testing.T) {
 	t.Run("enter connects", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.Connections = connList
-		_, cmd := m.handleConnectionsScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleConnectionsScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected connect cmd")
 		}
@@ -110,7 +110,7 @@ func TestHandleConnectionsScreen(t *testing.T) {
 	})
 	t.Run("enter with empty list", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, cmd := m.handleConnectionsScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleConnectionsScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd != nil {
 			t.Error("expected nil cmd for empty list")
 		}
@@ -120,7 +120,7 @@ func TestHandleConnectionsScreen(t *testing.T) {
 func TestHandleAddConnectionScreen(t *testing.T) {
 	t.Run("tab advances focus", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleAddConnectionScreen(tea.KeyMsg{Type: tea.KeyTab})
+		result, _ := m.handleAddConnectionScreen(tea.KeyPressMsg{Code: tea.KeyTab})
 		model := result.(Model)
 		if model.ConnFocusIdx != 1 {
 			t.Errorf("expected ConnFocusIdx=1, got %d", model.ConnFocusIdx)
@@ -128,7 +128,7 @@ func TestHandleAddConnectionScreen(t *testing.T) {
 	})
 	t.Run("shift+tab back", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleAddConnectionScreen(tea.KeyMsg{Type: tea.KeyShiftTab})
+		result, _ := m.handleAddConnectionScreen(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
 		model := result.(Model)
 		if model.ConnFocusIdx != 6 {
 			t.Errorf("expected ConnFocusIdx=6, got %d", model.ConnFocusIdx)
@@ -137,7 +137,7 @@ func TestHandleAddConnectionScreen(t *testing.T) {
 	t.Run("space on cluster toggle", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.ConnFocusIdx = 5
-		result, _ := m.handleAddConnectionScreen(tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}})
+		result, _ := m.handleAddConnectionScreen(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
 		model := result.(Model)
 		if !model.ConnClusterMode {
 			t.Error("expected cluster mode on")
@@ -148,16 +148,16 @@ func TestHandleAddConnectionScreen(t *testing.T) {
 		m.ConnFocusIdx = 5
 		m.ConnClusterMode = false
 		// Force an out-of-range focus scenario by pre-setting then toggling
-		_, _ = m.handleAddConnectionScreen(tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}})
+		_, _ = m.handleAddConnectionScreen(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
 	})
 	t.Run("space on text field sends to input", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleAddConnectionScreen(tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}})
+		_, _ = m.handleAddConnectionScreen(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
 	})
 	t.Run("enter on cluster toggle", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.ConnFocusIdx = 5
-		result, _ := m.handleAddConnectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		result, _ := m.handleAddConnectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		model := result.(Model)
 		if !model.ConnClusterMode {
 			t.Error("expected cluster toggled")
@@ -167,28 +167,28 @@ func TestHandleAddConnectionScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.ConnInputs[0].SetValue("name")
 		m.ConnInputs[1].SetValue("host")
-		_, cmd := m.handleAddConnectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleAddConnectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected add cmd")
 		}
 	})
 	t.Run("enter no submit when empty", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, cmd := m.handleAddConnectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleAddConnectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd != nil {
 			t.Error("expected nil cmd when missing fields")
 		}
 	})
 	t.Run("ctrl+t tests", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, cmd := m.handleAddConnectionScreen(tea.KeyMsg{Type: tea.KeyCtrlT})
+		_, cmd := m.handleAddConnectionScreen(tea.KeyPressMsg{Code: 't', Mod: tea.ModCtrl})
 		if cmd == nil {
 			t.Error("expected test cmd")
 		}
 	})
 	t.Run("esc cancels", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleAddConnectionScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		result, _ := m.handleAddConnectionScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 		model := result.(Model)
 		if model.Screen != types.ScreenConnections {
 			t.Errorf("expected ScreenConnections, got %v", model.Screen)
@@ -203,7 +203,7 @@ func TestHandleAddConnectionScreen(t *testing.T) {
 func TestHandleEditConnectionScreen(t *testing.T) {
 	t.Run("tab advances focus", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleEditConnectionScreen(tea.KeyMsg{Type: tea.KeyTab})
+		result, _ := m.handleEditConnectionScreen(tea.KeyPressMsg{Code: tea.KeyTab})
 		model := result.(Model)
 		if model.ConnFocusIdx != 1 {
 			t.Errorf("expected ConnFocusIdx=1, got %d", model.ConnFocusIdx)
@@ -211,7 +211,7 @@ func TestHandleEditConnectionScreen(t *testing.T) {
 	})
 	t.Run("shift+tab", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleEditConnectionScreen(tea.KeyMsg{Type: tea.KeyShiftTab})
+		result, _ := m.handleEditConnectionScreen(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
 		model := result.(Model)
 		if model.ConnFocusIdx != 6 {
 			t.Errorf("expected ConnFocusIdx=5, got %d", model.ConnFocusIdx)
@@ -220,7 +220,7 @@ func TestHandleEditConnectionScreen(t *testing.T) {
 	t.Run("space on cluster", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.ConnFocusIdx = 5
-		result, _ := m.handleEditConnectionScreen(tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}})
+		result, _ := m.handleEditConnectionScreen(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
 		model := result.(Model)
 		if !model.ConnClusterMode {
 			t.Error("expected cluster on")
@@ -228,12 +228,12 @@ func TestHandleEditConnectionScreen(t *testing.T) {
 	})
 	t.Run("space on text", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, _ = m.handleEditConnectionScreen(tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}})
+		_, _ = m.handleEditConnectionScreen(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
 	})
 	t.Run("enter on cluster toggle", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.ConnFocusIdx = 5
-		result, _ := m.handleEditConnectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		result, _ := m.handleEditConnectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		model := result.(Model)
 		if !model.ConnClusterMode {
 			t.Error("expected cluster toggled")
@@ -244,21 +244,21 @@ func TestHandleEditConnectionScreen(t *testing.T) {
 		m.EditingConnection = &types.Connection{ID: 1}
 		m.ConnInputs[0].SetValue("name")
 		m.ConnInputs[1].SetValue("host")
-		_, cmd := m.handleEditConnectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleEditConnectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected update cmd")
 		}
 	})
 	t.Run("enter no submit", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		_, cmd := m.handleEditConnectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		_, cmd := m.handleEditConnectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd != nil {
 			t.Error("expected nil cmd")
 		}
 	})
 	t.Run("esc cancels", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleEditConnectionScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		result, _ := m.handleEditConnectionScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 		model := result.(Model)
 		if model.Screen != types.ScreenConnections {
 			t.Errorf("expected ScreenConnections, got %v", model.Screen)
@@ -273,7 +273,7 @@ func TestHandleEditConnectionScreen(t *testing.T) {
 func TestHandleTestConnectionScreen(t *testing.T) {
 	t.Run("esc returns to add", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleTestConnectionScreen(tea.KeyMsg{Type: tea.KeyEsc})
+		result, _ := m.handleTestConnectionScreen(tea.KeyPressMsg{Code: tea.KeyEsc})
 		model := result.(Model)
 		if model.Screen != types.ScreenAddConnection {
 			t.Errorf("expected ScreenAddConnection, got %v", model.Screen)
@@ -281,7 +281,7 @@ func TestHandleTestConnectionScreen(t *testing.T) {
 	})
 	t.Run("enter returns to add", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		result, _ := m.handleTestConnectionScreen(tea.KeyMsg{Type: tea.KeyEnter})
+		result, _ := m.handleTestConnectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		model := result.(Model)
 		if model.Screen != types.ScreenAddConnection {
 			t.Errorf("expected ScreenAddConnection, got %v", model.Screen)
