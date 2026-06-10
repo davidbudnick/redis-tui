@@ -12,12 +12,15 @@ Set Height 1080
 Set TypingSpeed 0.04s
 Set Padding 20
 
-# Clean up leftover key from previous runs and launch
+# Clean up leftover key, seed an isolated demo config (standalone + cluster only), and launch
 Hide
 Type "docker exec standalone-redis-1 redis-cli DEL 'hello world'"
 Enter
 Sleep 1s
-Type "./bin/redis-tui"
+Type "export DEMO_HOME=$(mktemp -d) && mkdir -p $DEMO_HOME/.config/redis-tui && cp docs/demo-config.json $DEMO_HOME/.config/redis-tui/config.json"
+Enter
+Sleep 0.5s
+Type "HOME=$DEMO_HOME ./bin/redis-tui"
 Enter
 Sleep 2s
 Show
