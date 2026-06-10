@@ -1,0 +1,23 @@
+{
+  "connections": [
+    {
+      "id": 1,
+      "name": "standalone",
+      "host": "localhost",
+      "port": 6379,
+      "db": 0,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    },
+    {
+      "id": 2,
+      "name": "cluster",
+      "host": "localhost",
+      "port": 6380,
+      "db": 0,
+      "use_cluster": true,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    }
+  ]
+}
