@@ -263,6 +263,10 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "ctrl+c":
 		return m, tea.Quit
+	case "ctrl+y":
+		if value, ok := m.focusedInputValue(); ok && value != "" {
+			return m, m.Cmds.CopyToClipboard(value)
+		}
 	case "q":
 		if m.Screen == types.ScreenConnections {
 			return m, tea.Quit

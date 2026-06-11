@@ -163,6 +163,21 @@ func TestHandleKeysScreen_Actions(t *testing.T) {
 			t.Error("expected nil cmd")
 		}
 	})
+	t.Run("y copies selected key name", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		seedKeys(&m, 2)
+		_, cmd := m.handleKeysScreen(keyMsg('y'))
+		if cmd == nil {
+			t.Error("expected clipboard cmd")
+		}
+	})
+	t.Run("y with no keys", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		_, cmd := m.handleKeysScreen(keyMsg('y'))
+		if cmd != nil {
+			t.Error("expected nil cmd")
+		}
+	})
 	t.Run("a adds key", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		result, _ := m.handleKeysScreen(keyMsg('a'))

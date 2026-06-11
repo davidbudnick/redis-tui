@@ -25,6 +25,7 @@ func (m Model) viewHelp() string {
 				{"j/k", "Navigate up/down"},
 				{"Ctrl+U/D", "Page up/down"},
 				{"g/G", "Top/Bottom"},
+				{"Ctrl+Y", "Copy input text"},
 			},
 		},
 		{
@@ -46,6 +47,7 @@ func (m Model) viewHelp() string {
 				{"r", "Refresh keys"},
 				{"l", "Load more keys"},
 				{"/", "Filter by pattern"},
+				{"y", "Copy key name"},
 				{"s/S", "Sort / Toggle direction"},
 				{"v", "Search by value"},
 				{"e", "Export to JSON"},
