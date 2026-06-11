@@ -22,6 +22,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		return m.handleKeyPress(msg)
 
+	case tea.PasteMsg:
+		return m.handlePaste(msg)
+
 	case types.SearchDebounceMsg:
 		if msg.Seq == m.SearchSeq {
 			pattern := m.Inputs.PatternInput.Value()
