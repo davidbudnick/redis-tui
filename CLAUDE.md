@@ -12,7 +12,7 @@ make test         # Run tests: go test -v ./...
 make test-cover   # Tests with coverage report
 make lint         # Run go vet
 make fmt          # Format code with go fmt
-make run          # Run the application
+make run          # Build and run the application (make start is an alias)
 make dev-deps         # Install goreleaser
 make test-cover-check # Tests + fail if any function < 100% coverage
 ```
