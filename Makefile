@@ -6,7 +6,7 @@ COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 LDFLAGS := -ldflags "-X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)"
 
-.PHONY: all build install clean test test-cover test-cover-check lint run release snapshot demo \
+.PHONY: all build install clean test test-cover test-cover-check lint run start release snapshot demo \
 	docker-up docker-down docker-seed \
 	docker-up-standalone docker-up-standalone-stack docker-up-cluster docker-up-cluster-stack \
 	docker-down-standalone docker-down-standalone-stack docker-down-cluster docker-down-cluster-stack \
@@ -66,9 +66,12 @@ lint:
 fmt:
 	go fmt ./...
 
-## Run the application
-run:
-	go run ./
+## Build and run the application
+run: build
+	./bin/$(APP_NAME)
+
+## Alias for run
+start: run
 
 ## Run the application in debug mode
 debug-server:
@@ -173,7 +176,8 @@ help:
 	@echo "    test-cover-check  - Fail if any function < 100%%"
 	@echo "    lint        - Run linter"
 	@echo "    fmt         - Format code"
-	@echo "    run         - Run the application"
+	@echo "    run         - Build and run the application"
+	@echo "    start       - Alias for run"
 	@echo "    build-all   - Build for multiple platforms"
 	@echo "    release     - Create a release with goreleaser"
 	@echo "    snapshot    - Create a snapshot release"
