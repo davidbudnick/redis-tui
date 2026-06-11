@@ -229,6 +229,10 @@ func (m Model) handleKeysScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.Screen = types.ScreenTreeView
 		m.Loading = true
 		return m, m.Cmds.LoadKeyPrefixes(m.TreeSeparator, 3)
+	case "y":
+		if len(m.Keys) > 0 && m.SelectedKeyIdx < len(m.Keys) {
+			return m, m.Cmds.CopyToClipboard(m.Keys[m.SelectedKeyIdx].Key)
+		}
 	case "ctrl+g":
 		m.Loading = true
 		return m, m.Cmds.LoadRedisConfig("*")
