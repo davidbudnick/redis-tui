@@ -539,10 +539,10 @@ func TestDisconnect_WithPubsubField(t *testing.T) {
 
 	// Subscribe via the underlying client and store the pubsub on the
 	// Client struct so disconnectLocked exercises the c.pubsub != nil branch.
+	// We deliberately don't Receive the confirmation: go-redis 9.20.1 peeks a
+	// fixed 36-byte push-frame window, which blocks forever on the short frame
+	// miniredis returns for a brief channel name.
 	client.pubsub = client.client.Subscribe(client.ctx, "fake")
-	if _, err := client.pubsub.Receive(client.ctx); err != nil {
-		t.Fatalf("Receive subscription confirmation error: %v", err)
-	}
 
 	if err := client.Disconnect(); err != nil {
 		t.Fatalf("Disconnect error: %v", err)
