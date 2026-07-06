@@ -3,7 +3,7 @@ module github.com/davidbudnick/redis-tui
 go 1.26.4
 
 require (
-	charm.land/bubbles/v2 v2.1.0
+	charm.land/bubbles/v2 v2.1.1
 	charm.land/bubbletea/v2 v2.0.7
 	charm.land/lipgloss/v2 v2.0.4
 	github.com/alicebob/miniredis/v2 v2.38.0
