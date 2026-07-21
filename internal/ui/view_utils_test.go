@@ -85,6 +85,177 @@ func TestTruncate(t *testing.T) {
 	}
 }
 
+func TestColorizeProtobuf(t *testing.T) {
+	if colorizeProtobuf("") != "" {
+		t.Error("empty should stay empty")
+	}
+	in := "Format: s2+protobuf\nSize: 1 KB\n\n1: \"menu\"\n2: 7\n3: {\n  1: \"cat\"\n  4: 0xab\n  5: <3 bytes>\n}\n… truncated\n(unable to decode)\nnot-a-field\n"
+	out := colorizeProtobuf(in)
+	if !strings.Contains(out, "menu") || !strings.Contains(out, "Format:") {
+		t.Errorf("colorize lost content: %q", out)
+	}
+	// field line with no space after colon
+	if got := colorizeProtobufLine("1:\"x\""); !strings.Contains(got, "x") {
+		t.Errorf("no-space colon: %q", got)
+	}
+	if got := colorizeProtobufLine("  }"); !strings.Contains(got, "}") {
+		t.Errorf("brace: %q", got)
+	}
+	if got := colorizeProtobufLine("↑ 3 more"); !strings.Contains(got, "↑") {
+		t.Errorf("hint: %q", got)
+	}
+	if got := colorizeProtobufLine("12"); got != "12" {
+		t.Errorf("non-field passthrough: %q", got)
+	}
+	if got := colorizeProtobufLine("ab: 1"); got != "ab: 1" {
+		t.Errorf("non-numeric field: %q", got)
+	}
+	if got := colorizeProtobufLine(""); got != "" {
+		t.Errorf("empty line: %q", got)
+	}
+	if got := colorizeProtobufLine("1: "); !strings.Contains(got, "1") {
+		t.Errorf("empty value: %q", got)
+	}
+}
+
+func TestWrapPlainLines(t *testing.T) {
+	got := wrapPlainLines([]string{"", "hello-world-extra"}, 8)
+	if len(got) < 3 {
+		t.Fatalf("expected wraps, got %v", got)
+	}
+	if got[0] != "" || got[1] != "hello-wo" {
+		t.Errorf("unexpected wrap: %v", got)
+	}
+	// width below floor clamps to 8
+	got = wrapPlainLines([]string{"abcdefghij"}, 2)
+	if len(got) != 2 || got[0] != "abcdefgh" {
+		t.Errorf("narrow clamp wrap got=%v", got)
+	}
+}
+
+func TestDetailLayoutHelpers(t *testing.T) {
+	if w := detailBoxWidth(200); w < 50 || w > 194 {
+		t.Errorf("detailBoxWidth(200)=%d", w)
+	}
+	if w := detailContentWidth(40); w != 36 {
+		t.Errorf("content width=%d", w)
+	}
+	if w := detailContentWidth(10); w != 20 {
+		t.Errorf("min content width=%d", w)
+	}
+	if n := detailMaxVisible(10); n != 5 {
+		t.Errorf("min visible=%d", n)
+	}
+	if n := detailMaxVisible(40); n != 24 {
+		t.Errorf("visible=%d", n)
+	}
+}
+
+func TestPadRightTruncateRunes(t *testing.T) {
+	if got := padRight("ab", 5); got != "ab   " {
+		t.Errorf("padRight = %q", got)
+	}
+	if got := padRight("abcdef", 3); got != "abcdef" {
+		t.Errorf("padRight no-op = %q", got)
+	}
+	if got := truncateRunes("hello", 3); got != "he…" {
+		t.Errorf("truncateRunes = %q", got)
+	}
+	if got := truncateRunes("hi", 5); got != "hi" {
+		t.Errorf("truncate short = %q", got)
+	}
+	if got := truncateRunes("hello", 0); got != "" {
+		t.Errorf("truncate 0 = %q", got)
+	}
+	if got := truncateRunes("hello", 1); got != "h" {
+		t.Errorf("truncate 1 = %q", got)
+	}
+}
+
+func TestEnsureDetailCursorVisible(t *testing.T) {
+	c, s := ensureDetailCursorVisible(0, 0, 0, 10)
+	if c != 0 || s != 0 {
+		t.Errorf("empty: %d %d", c, s)
+	}
+	c, s = ensureDetailCursorVisible(-1, 0, 10, 5)
+	if c != 0 {
+		t.Errorf("neg cursor: %d", c)
+	}
+	c, s = ensureDetailCursorVisible(99, 0, 10, 5)
+	if c != 9 {
+		t.Errorf("clamp high: %d", c)
+	}
+	c, s = ensureDetailCursorVisible(2, 5, 20, 5)
+	if s != 2 {
+		t.Errorf("scroll up to cursor: s=%d", s)
+	}
+	c, s = ensureDetailCursorVisible(15, 0, 20, 5)
+	if s != 13 {
+		t.Errorf("scroll down to cursor: s=%d want 13", s)
+	}
+	// tiny maxVisible → window floors at 1; negative scroll clamps
+	c, s = ensureDetailCursorVisible(0, -5, 3, 1)
+	if s != 0 || c != 0 {
+		t.Errorf("tiny window: c=%d s=%d", c, s)
+	}
+	_ = c
+}
+
+func TestScrollValueLines(t *testing.T) {
+	lines := make([]string, 20)
+	for i := range lines {
+		lines[i] = string(rune('a' + i%26))
+	}
+	// fits
+	vis, top, bot, sc := scrollValueLines(lines[:3], 0, 10)
+	if len(vis) != 3 || top != "" || bot != "" || sc != 0 {
+		t.Errorf("fit: vis=%d top=%q bot=%q sc=%d", len(vis), top, bot, sc)
+	}
+	// overflow from top
+	vis, top, bot, sc = scrollValueLines(lines, 0, 5)
+	if sc != 0 || top != "" || bot == "" || len(vis) == 0 {
+		t.Errorf("top: vis=%d top=%q bot=%q sc=%d", len(vis), top, bot, sc)
+	}
+	// overflow mid
+	vis, top, bot, sc = scrollValueLines(lines, 5, 5)
+	if sc != 5 || top == "" || bot == "" {
+		t.Errorf("mid: vis=%d top=%q bot=%q sc=%d", len(vis), top, bot, sc)
+	}
+	// clamp high scroll — should land near EOF with no bottom hint
+	vis, top, bot, sc = scrollValueLines(lines, 999, 5)
+	if sc >= 20 {
+		t.Errorf("scroll not clamped: %d", sc)
+	}
+	if bot != "" {
+		t.Errorf("expected no bottom hint at EOF, got %q (sc=%d vis=%d)", bot, sc, len(vis))
+	}
+	if top == "" {
+		t.Error("expected top hint when scrolled to end")
+	}
+	// negative scroll
+	_, _, _, sc = scrollValueLines(lines, -3, 5)
+	if sc != 0 {
+		t.Errorf("neg scroll=%d", sc)
+	}
+	// tiny / zero maxVisible
+	vis, _, bot, _ = scrollValueLines(lines, 0, 1)
+	if len(vis) < 1 || bot == "" {
+		t.Errorf("tiny window vis=%d bot=%q", len(vis), bot)
+	}
+	vis, _, _, _ = scrollValueLines(lines, 2, 0)
+	if len(vis) < 1 {
+		t.Error("zero maxVisible should still show a line")
+	}
+	// single-line reclaim at EOF with top hint
+	_, top, bot, sc = scrollValueLines(lines, 19, 2)
+	if sc > 19 {
+		t.Errorf("eof scroll=%d", sc)
+	}
+	_ = top
+	_ = bot
+	_ = vis
+}
+
 func TestParseLogEntry(t *testing.T) {
 	tests := []struct {
 		name          string

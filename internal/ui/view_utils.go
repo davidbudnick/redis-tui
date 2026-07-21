@@ -12,41 +12,46 @@ import (
 )
 
 var (
-	titleStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39")).MarginBottom(1)
-	headerStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("15"))
-	normalStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("15"))
-	selectedStyle = lipgloss.NewStyle().Bold(true).Background(lipgloss.Color("39")).Foreground(lipgloss.Color("0"))
+	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39")).MarginBottom(1)
+	headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("15"))
+	normalStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("15"))
+	// selectedStyle matches phoenix TUI: bold dark text on accent cyan/blue band.
+	selectedStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("16")).Background(lipgloss.Color("39"))
 	keyStyle      = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6"))
 	descStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("15"))
 	errorStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
 	successStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-	dimStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-	helpStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	dimStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	helpStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("246"))
+	// metaDimStyle is brighter than dimStyle for Format/Size headers and scroll hints.
+	metaDimStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
 
 	// Pre-allocated type-color styles to avoid per-frame allocations
 	typeStyleMap = map[types.KeyType]lipgloss.Style{
-		types.KeyTypeString: lipgloss.NewStyle().Foreground(lipgloss.Color("2")),
-		types.KeyTypeList:   lipgloss.NewStyle().Foreground(lipgloss.Color("3")),
-		types.KeyTypeSet:    lipgloss.NewStyle().Foreground(lipgloss.Color("4")),
-		types.KeyTypeZSet:   lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
-		types.KeyTypeHash:   lipgloss.NewStyle().Foreground(lipgloss.Color("6")),
+		types.KeyTypeString:      lipgloss.NewStyle().Foreground(lipgloss.Color("2")),
+		types.KeyTypeList:        lipgloss.NewStyle().Foreground(lipgloss.Color("3")),
+		types.KeyTypeSet:         lipgloss.NewStyle().Foreground(lipgloss.Color("4")),
+		types.KeyTypeZSet:        lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
+		types.KeyTypeHash:        lipgloss.NewStyle().Foreground(lipgloss.Color("6")),
 		types.KeyTypeStream:      lipgloss.NewStyle().Foreground(lipgloss.Color("13")),
 		types.KeyTypeJSON:        lipgloss.NewStyle().Foreground(lipgloss.Color("208")),
 		types.KeyTypeHyperLogLog: lipgloss.NewStyle().Foreground(lipgloss.Color("9")),
 		types.KeyTypeBitmap:      lipgloss.NewStyle().Foreground(lipgloss.Color("12")),
 		types.KeyTypeGeo:         lipgloss.NewStyle().Foreground(lipgloss.Color("10")),
+		types.KeyTypeProtobuf:    lipgloss.NewStyle().Foreground(lipgloss.Color("141")),
 	}
 	typeStyleBoldMap = map[types.KeyType]lipgloss.Style{
-		types.KeyTypeString: lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true),
-		types.KeyTypeList:   lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Bold(true),
-		types.KeyTypeSet:    lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Bold(true),
-		types.KeyTypeZSet:   lipgloss.NewStyle().Foreground(lipgloss.Color("5")).Bold(true),
-		types.KeyTypeHash:   lipgloss.NewStyle().Foreground(lipgloss.Color("6")).Bold(true),
+		types.KeyTypeString:      lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true),
+		types.KeyTypeList:        lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Bold(true),
+		types.KeyTypeSet:         lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Bold(true),
+		types.KeyTypeZSet:        lipgloss.NewStyle().Foreground(lipgloss.Color("5")).Bold(true),
+		types.KeyTypeHash:        lipgloss.NewStyle().Foreground(lipgloss.Color("6")).Bold(true),
 		types.KeyTypeStream:      lipgloss.NewStyle().Foreground(lipgloss.Color("13")).Bold(true),
 		types.KeyTypeJSON:        lipgloss.NewStyle().Foreground(lipgloss.Color("208")).Bold(true),
 		types.KeyTypeHyperLogLog: lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true),
 		types.KeyTypeBitmap:      lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true),
 		types.KeyTypeGeo:         lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true),
+		types.KeyTypeProtobuf:    lipgloss.NewStyle().Foreground(lipgloss.Color("141")).Bold(true),
 	}
 	defaultTypeStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("15"))
 	defaultTypeStyleBold = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true)
@@ -152,6 +157,16 @@ func formatPossibleJSON(s string) string {
 	return s
 }
 
+// Shared syntax-highlight styles (jq-style).
+var (
+	jsonKeyStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("39"))  // Blue for keys / field numbers
+	stringValueStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("34"))  // Green for strings
+	jsonNumberStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("33"))  // Yellow for numbers
+	boolStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("35"))  // Magenta for booleans
+	jsonNullStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("90"))  // Gray for null
+	bracketStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("15"))  // White for brackets
+)
+
 // colorizeJSON adds jq-style syntax highlighting to JSON
 func colorizeJSON(s string) string {
 	var result strings.Builder
@@ -159,14 +174,6 @@ func colorizeJSON(s string) string {
 	escaped := false
 	isKey := false
 	afterColon := false
-
-	// jq-style colors
-	jsonKeyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("39"))     // Blue for keys
-	stringStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("34"))      // Green for string values
-	jsonNumberStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("33"))  // Yellow for numbers
-	boolStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("35"))        // Magenta for booleans
-	jsonNullStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("90"))    // Gray for null
-	bracketStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("15"))     // White for brackets
 
 	i := 0
 	for i < len(s) {
@@ -197,7 +204,7 @@ func colorizeJSON(s string) string {
 					if isKey {
 						result.WriteString(jsonKeyStyle.Render(str))
 					} else {
-						result.WriteString(stringStyle.Render(str))
+						result.WriteString(stringValueStyle.Render(str))
 					}
 					i = end + 1
 					inString = false
@@ -321,6 +328,226 @@ func isInArrayContext(s string, pos int) bool {
 		}
 	}
 	return false
+}
+
+// colorizeProtobuf highlights schema-less protobuf text (field numbers, strings, numbers, braces).
+func colorizeProtobuf(s string) string {
+	if s == "" {
+		return s
+	}
+	lines := strings.Split(s, "\n")
+	for i, line := range lines {
+		lines[i] = colorizeProtobufLine(line)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// colorizeProtobufLine highlights a single protobuf decode_raw line.
+func colorizeProtobufLine(line string) string {
+	indentLen := 0
+	for indentLen < len(line) && line[indentLen] == ' ' {
+		indentLen++
+	}
+	indent := line[:indentLen]
+	rest := line[indentLen:]
+	if rest == "" {
+		return line
+	}
+
+	switch {
+	case strings.HasPrefix(rest, "Format:"), strings.HasPrefix(rest, "Size:"):
+		return metaDimStyle.Render(line)
+	case strings.HasPrefix(rest, "…"), strings.HasPrefix(rest, "↑"), strings.HasPrefix(rest, "↓"):
+		return metaDimStyle.Render(line)
+	case strings.HasPrefix(rest, "("):
+		return metaDimStyle.Render(line)
+	case rest == "{" || rest == "}":
+		return indent + bracketStyle.Render(rest)
+	}
+
+	colon := strings.IndexByte(rest, ':')
+	if colon <= 0 {
+		return line
+	}
+	numPart := rest[:colon]
+	for _, c := range numPart {
+		if c < '0' || c > '9' {
+			return line
+		}
+	}
+
+	valPart := ""
+	if colon+1 < len(rest) {
+		if rest[colon+1] == ' ' {
+			valPart = rest[colon+2:]
+		} else {
+			valPart = rest[colon+1:]
+		}
+	}
+
+	var b strings.Builder
+	b.WriteString(indent)
+	b.WriteString(jsonKeyStyle.Render(numPart))
+	b.WriteString(": ")
+	switch {
+	case valPart == "{" || valPart == "}":
+		b.WriteString(bracketStyle.Render(valPart))
+	case strings.HasPrefix(valPart, `"`):
+		b.WriteString(stringValueStyle.Render(valPart))
+	case strings.HasPrefix(valPart, "<"):
+		b.WriteString(metaDimStyle.Render(valPart))
+	case valPart != "":
+		b.WriteString(jsonNumberStyle.Render(valPart))
+	}
+	return b.String()
+}
+
+// padRight pads plain text to width with trailing spaces (for full-width selection bands).
+func padRight(s string, width int) string {
+	n := len([]rune(s))
+	if n >= width {
+		return s
+	}
+	return s + strings.Repeat(" ", width-n)
+}
+
+// truncateRunes truncates plain text to at most width runes.
+func truncateRunes(s string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= width {
+		return s
+	}
+	if width <= 1 {
+		return string(runes[:width])
+	}
+	return string(runes[:width-1]) + "…"
+}
+
+// wrapPlainLines hard-wraps lines to width so scroll counts match the rendered box.
+func wrapPlainLines(lines []string, width int) []string {
+	if width < 8 {
+		width = 8
+	}
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if line == "" {
+			out = append(out, "")
+			continue
+		}
+		runes := []rune(line)
+		for len(runes) > width {
+			out = append(out, string(runes[:width]))
+			runes = runes[width:]
+		}
+		out = append(out, string(runes))
+	}
+	return out
+}
+
+// detailBoxWidth is the centered detail value box width for the current terminal size.
+func detailBoxWidth(width int) int {
+	boxWidth := width * 3 / 5
+	boxWidth = max(boxWidth, 50)
+	boxWidth = min(boxWidth, width-6)
+	return boxWidth
+}
+
+// detailContentWidth is the usable text width inside the value box (excludes padding).
+func detailContentWidth(boxWidth int) int {
+	w := boxWidth - 4 // Padding(1, 2) left+right
+	if w < 20 {
+		return 20
+	}
+	return w
+}
+
+// detailChromeLines is vertical space used by title, meta, borders, padding, and help.
+const detailChromeLines = 16
+
+// detailMaxVisible returns how many content lines fit in the value box.
+func detailMaxVisible(height int) int {
+	maxVisible := height - detailChromeLines
+	if maxVisible < 5 {
+		return 5
+	}
+	return maxVisible
+}
+
+// scrollValueLines windows lines into maxVisible slots, reserving space for scroll hints.
+func scrollValueLines(valueLines []string, scroll, maxVisible int) (visible []string, topHint, bottomHint string, clampedScroll int) {
+	if maxVisible < 1 {
+		maxVisible = 1
+	}
+	clampedScroll = max(scroll, 0)
+	total := len(valueLines)
+	if total <= maxVisible {
+		return valueLines, "", "", 0
+	}
+
+	// Content rows available after reserving hint rows inside the box.
+	// While not at EOF we always reserve 1 for "↓ more"; when scrolled, also 1 for "↑ more".
+	contentRows := func(scrolled bool) int {
+		n := maxVisible - 1
+		if scrolled {
+			n--
+		}
+		return max(n, 1)
+	}
+
+	avail := contentRows(clampedScroll > 0)
+	maxScroll := total - avail
+	clampedScroll = min(clampedScroll, maxScroll)
+	avail = contentRows(clampedScroll > 0)
+	end := min(clampedScroll+avail, total)
+
+	// At EOF drop the bottom hint and fill with content.
+	if end >= total {
+		rows := maxVisible
+		if clampedScroll > 0 {
+			rows--
+		}
+		end = min(clampedScroll+max(rows, 1), total)
+	}
+
+	visible = valueLines[clampedScroll:end]
+	if clampedScroll > 0 {
+		topHint = metaDimStyle.Render(fmt.Sprintf("↑ %d more lines above", clampedScroll))
+	}
+	if end < total {
+		bottomHint = metaDimStyle.Render(fmt.Sprintf("↓ %d more lines below", total-end))
+	}
+	return visible, topHint, bottomHint, clampedScroll
+}
+
+// ensureDetailCursorVisible adjusts DetailScroll so DetailCursor stays in the viewport.
+func ensureDetailCursorVisible(cursor, scroll, total, maxVisible int) (int, int) {
+	if total <= 0 {
+		return 0, 0
+	}
+	if cursor < 0 {
+		cursor = 0
+	}
+	if cursor >= total {
+		cursor = total - 1
+	}
+	// Worst-case content rows when both scroll hints are shown.
+	window := maxVisible - 2
+	if window < 1 {
+		window = 1
+	}
+	if cursor < scroll {
+		scroll = cursor
+	}
+	if cursor >= scroll+window {
+		scroll = cursor - window + 1
+	}
+	if scroll < 0 {
+		scroll = 0
+	}
+	return cursor, scroll
 }
 
 func (m Model) renderModal(content string) string {

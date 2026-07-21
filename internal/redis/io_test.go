@@ -1016,6 +1016,58 @@ func TestQueueValueFetch_ReJSON(t *testing.T) {
 	}
 }
 
+func TestCompareKeys_StringSubtypes(t *testing.T) {
+	client, mr := setupTestClient(t)
+
+	var protoRaw []byte
+	protoRaw = append(protoRaw, 0x0a, 0x03)
+	protoRaw = append(protoRaw, []byte("abc")...)
+	mr.Set("proto", string(protoRaw))
+	mr.Set("hll", "HYLL"+string(make([]byte, 12)))
+
+	v1, v2, err := client.CompareKeys("proto", "hll")
+	if err != nil {
+		t.Fatalf("CompareKeys error: %v", err)
+	}
+	if v1.Type != types.KeyTypeProtobuf {
+		t.Errorf("proto type = %q, want protobuf", v1.Type)
+	}
+	if v1.DecodedValue == "" || !containsStr(v1.DecodedValue, `1: "abc"`) {
+		t.Errorf("proto decoded = %q", v1.DecodedValue)
+	}
+	if v2.Type != types.KeyTypeHyperLogLog {
+		t.Errorf("hll type = %q, want hyperloglog", v2.Type)
+	}
+
+	// Bitmap path: invalid UTF-8 that is not protobuf.
+	if err := client.SetBit("bm", 0, 1); err != nil {
+		t.Fatalf("SetBit: %v", err)
+	}
+	if err := client.SetBit("bm", 1, 1); err != nil {
+		t.Fatalf("SetBit: %v", err)
+	}
+	vb, _, err := client.CompareKeys("bm", "proto")
+	if err != nil {
+		t.Fatalf("CompareKeys bitmap error: %v", err)
+	}
+	if vb.Type != types.KeyTypeBitmap {
+		t.Errorf("bitmap type = %q, want bitmap", vb.Type)
+	}
+}
+
+func containsStr(s, sub string) bool {
+	return len(s) >= len(sub) && (s == sub || len(sub) == 0 || indexOfStr(s, sub) >= 0)
+}
+
+func indexOfStr(s, sub string) int {
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if s[i:i+len(sub)] == sub {
+			return i
+		}
+	}
+	return -1
+}
+
 func TestExtractValue_AllTypes(t *testing.T) {
 	// Empty fetch cmds — verifies the nil-check branches in each case arm.
 	for _, kt := range []string{"string", "list", "set", "zset", "hash", "stream", "ReJSON-RL"} {

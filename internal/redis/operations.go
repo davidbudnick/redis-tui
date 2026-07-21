@@ -4,9 +4,13 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/davidbudnick/redis-tui/internal/decode"
 	"github.com/davidbudnick/redis-tui/internal/types"
 	"github.com/redis/go-redis/v9"
 )
+
+// maxBitPositions caps how many set-bit offsets we materialize for display.
+const maxBitPositions = 256
 
 // GetValue retrieves the value for a key
 func (c *Client) GetValue(key string) (types.RedisValue, error) {
@@ -33,22 +37,14 @@ func (c *Client) GetValue(key string) (types.RedisValue, error) {
 			if err == nil {
 				value.HLLCount = count
 			}
+		} else if decoded, ok := decode.TryBinary([]byte(val)); ok {
+			value.Type = types.KeyTypeProtobuf
+			value.DecodedValue = decoded.Text
+			value.DecodedFormat = decoded.Format
+			value.RawSize = decoded.RawSize
+			value.DecodedSize = decoded.DecodedSize
 		} else if isBinaryString(val) {
-			// Detect Bitmap: binary data (not HLL)
-			value.Type = types.KeyTypeBitmap
-			count, err := c.cmdable().BitCount(c.ctx, key, &redis.BitCount{Start: 0, End: -1}).Result()
-			if err == nil {
-				value.BitCount = count
-			}
-			// Extract set bit positions from raw bytes
-			for byteIdx := 0; byteIdx < len(val); byteIdx++ {
-				b := val[byteIdx]
-				for bit := 7; bit >= 0; bit-- {
-					if b&(1<<uint(bit)) != 0 {
-						value.BitPositions = append(value.BitPositions, int64(byteIdx*8+(7-bit)))
-					}
-				}
-			}
+			applyBinaryStringValue(&value, val, c, key)
 		}
 
 	case "list":
@@ -155,6 +151,36 @@ func isBinaryString(s string) bool {
 		return false
 	}
 	return !utf8.ValidString(s)
+}
+
+// applyBinaryStringValue classifies remaining binary Redis strings as bitmaps.
+func applyBinaryStringValue(value *types.RedisValue, val string, c *Client, key string) {
+	value.Type = types.KeyTypeBitmap
+	count, err := c.cmdable().BitCount(c.ctx, key, &redis.BitCount{Start: 0, End: -1}).Result()
+	if err == nil {
+		value.BitCount = count
+	}
+	value.BitPositions = extractBitPositions([]byte(val), maxBitPositions)
+}
+
+// extractBitPositions returns up to max set bit offsets from raw bytes.
+func extractBitPositions(val []byte, max int) []int64 {
+	if max <= 0 {
+		return nil
+	}
+	var positions []int64
+	for byteIdx := 0; byteIdx < len(val); byteIdx++ {
+		b := val[byteIdx]
+		for bit := 7; bit >= 0; bit-- {
+			if b&(1<<uint(bit)) != 0 {
+				positions = append(positions, int64(byteIdx*8+(7-bit)))
+				if len(positions) >= max {
+					return positions
+				}
+			}
+		}
+	}
+	return positions
 }
 
 // JSONGet retrieves a JSON value from a RedisJSON key

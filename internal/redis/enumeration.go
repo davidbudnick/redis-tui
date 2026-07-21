@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/davidbudnick/redis-tui/internal/decode"
 	"github.com/davidbudnick/redis-tui/internal/types"
 	"github.com/redis/go-redis/v9"
 )
@@ -414,9 +415,9 @@ func (c *Client) GetKeyPrefixes(separator string, maxDepth int) ([]string, error
 	return result, nil
 }
 
-// detectStringSubtypes checks string-typed keys for HLL/bitmap subtypes using
-// a single pipeline GET. Keys whose raw value starts with "HYLL" become
-// KeyTypeHyperLogLog; keys with binary (non-UTF-8) content become KeyTypeBitmap.
+// detectStringSubtypes checks string-typed keys for HLL/protobuf/bitmap subtypes
+// using a single pipeline GET. HYLL prefix → hyperloglog; s2/protobuf binary →
+// protobuf; remaining invalid UTF-8 → bitmap.
 func (c *Client) detectStringSubtypes(keys []types.RedisKey) []types.RedisKey {
 	// Collect indices of string keys
 	var stringIdxs []int
@@ -443,6 +444,8 @@ func (c *Client) detectStringSubtypes(keys []types.RedisKey) []types.RedisKey {
 		}
 		if len(val) >= 4 && val[:4] == "HYLL" {
 			keys[idx].Type = types.KeyTypeHyperLogLog
+		} else if decode.LooksLikeProtobuf([]byte(val)) {
+			keys[idx].Type = types.KeyTypeProtobuf
 		} else if isBinaryString(val) {
 			keys[idx].Type = types.KeyTypeBitmap
 		}

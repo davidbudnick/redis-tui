@@ -148,7 +148,8 @@ type Model struct {
 	PreviewKey    string
 	PreviewValue  types.RedisValue
 	PreviewScroll int
-	DetailScroll  int
+	DetailScroll  int // viewport top line in the detail value body
+	DetailCursor  int // selected line in the detail value body (blue band)
 
 	// Live metrics dashboard
 	LiveMetrics       *types.LiveMetrics
