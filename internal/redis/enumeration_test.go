@@ -947,9 +947,8 @@ func TestScanKeys_DetectStringSubtypes_LargeValues(t *testing.T) {
 	// the key must stay a plain string.
 	mr.Set("large:text", strings.Repeat("a", subtypeProbeBytes*2))
 
-	// Large binary value: incomplete probes stay "string" so large compressed
-	// protobuf blobs are not mislabeled as bitmaps. GetValue still classifies
-	// on open.
+	// Binary larger than the probe window but under subtypeFullFetchMax is
+	// re-fetched and classified as bitmap when not protobuf.
 	bin := make([]byte, subtypeProbeBytes*2)
 	for i := range bin {
 		bin[i] = 0xff
@@ -958,6 +957,27 @@ func TestScanKeys_DetectStringSubtypes_LargeValues(t *testing.T) {
 
 	// Short complete binary value still classifies as bitmap from the probe alone.
 	mr.Set("short:bin", string([]byte{0xff, 0xfe}))
+
+	// s2+protobuf larger than the probe window must still show as protobuf after
+	// the small full-GET follow-up (not wait until the key is selected).
+	var protoRaw []byte
+	for i := 0; i < 80; i++ {
+		s := fmt.Sprintf("item-description-padding-%04d-xxxxxxxx", i)
+		protoRaw = append(protoRaw, 0x12, byte(len(s)))
+		protoRaw = append(protoRaw, s...)
+	}
+	compressed := s2.Encode(nil, protoRaw)
+	if len(compressed) <= subtypeProbeBytes {
+		t.Fatalf("test fixture too small: compressed=%d probe=%d", len(compressed), subtypeProbeBytes)
+	}
+	mr.Set("large:s2proto", string(compressed))
+
+	// Huge binary over subtypeFullFetchMax is not fully re-fetched; stays string.
+	huge := make([]byte, int(subtypeFullFetchMax)+1024)
+	for i := range huge {
+		huge[i] = 0xab
+	}
+	mr.Set("huge:bin", string(huge))
 
 	keys, _, err := client.ScanKeys("*", 0, 100)
 	if err != nil {
@@ -970,11 +990,72 @@ func TestScanKeys_DetectStringSubtypes_LargeValues(t *testing.T) {
 	if byName["large:text"] != "string" {
 		t.Errorf("large:text type = %q, want string", byName["large:text"])
 	}
-	if byName["large:bin"] != "string" {
-		t.Errorf("large:bin type = %q, want string (incomplete probe)", byName["large:bin"])
+	if byName["large:bin"] != "bitmap" {
+		t.Errorf("large:bin type = %q, want bitmap", byName["large:bin"])
 	}
 	if byName["short:bin"] != "bitmap" {
 		t.Errorf("short:bin type = %q, want bitmap", byName["short:bin"])
+	}
+	if byName["large:s2proto"] != types.KeyTypeProtobuf {
+		t.Errorf("large:s2proto type = %q, want protobuf", byName["large:s2proto"])
+	}
+	if byName["huge:bin"] != "string" {
+		t.Errorf("huge:bin type = %q, want string (over full-fetch cap)", byName["huge:bin"])
+	}
+}
+
+func TestScanKeys_DetectStringSubtypes_HugeBinaryNoFetch(t *testing.T) {
+	client, mr := setupTestClient(t)
+	// Only oversize binary keys: second pass finds nothing to full-GET.
+	huge := make([]byte, int(subtypeFullFetchMax)+8)
+	for i := range huge {
+		huge[i] = 0xcd
+	}
+	mr.Set("only:huge", string(huge))
+	keys, _, err := client.ScanKeys("only:huge", 0, 10)
+	if err != nil {
+		t.Fatalf("ScanKeys: %v", err)
+	}
+	if len(keys) != 1 || keys[0].Type != "string" {
+		t.Fatalf("got %+v, want string", keys)
+	}
+}
+
+func TestDetectStringSubtypes_FullGetError(t *testing.T) {
+	// GETRANGE returns a full probe of binary bytes → ambiguous; STRLEN is
+	// small enough to full-GET; GET then fails and the key stays string.
+	srv := newFakeRedisServer(t)
+	probe := strings.Repeat("\xff", subtypeProbeBytes)
+	srv.setHandler(func(argv []string) string {
+		switch argv[0] {
+		case "SCAN":
+			return "*2\r\n$1\r\n0\r\n*1\r\n$1\r\nx\r\n"
+		case "TYPE":
+			return "+string\r\n"
+		case "TTL":
+			return ":-1\r\n"
+		case "GETRANGE":
+			return fmt.Sprintf("$%d\r\n%s\r\n", len(probe), probe)
+		case "STRLEN":
+			return ":512\r\n"
+		case "GET":
+			return "-ERR injected\r\n"
+		}
+		return ""
+	})
+	host, port := srv.addr()
+	c := NewClient()
+	if err := c.Connect(types.Connection{Name: "test", Host: host, Port: port}); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	t.Cleanup(func() { _ = c.Disconnect() })
+
+	keys, _, err := c.ScanKeys("*", 0, 100)
+	if err != nil {
+		t.Fatalf("ScanKeys: %v", err)
+	}
+	if len(keys) != 1 || keys[0].Type != "string" {
+		t.Fatalf("got %+v, want string after GET error", keys)
 	}
 }
 

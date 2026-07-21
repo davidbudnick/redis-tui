@@ -108,6 +108,10 @@ const (
 	// (via GETRANGE) to detect HLL/protobuf/bitmap subtypes without transferring
 	// the full value on every scan page.
 	subtypeProbeBytes = 256
+	// subtypeFullFetchMax is the largest string we will fully GET during scan
+	// classification when a short probe looks binary but is not yet classifiable
+	// (e.g. s2-compressed protobuf needs the complete blob to decode).
+	subtypeFullFetchMax int64 = 512 * 1024
 )
 
 // ScanKeysWithRegex scans keys using regex pattern with early termination.
@@ -420,8 +424,10 @@ func (c *Client) GetKeyPrefixes(separator string, maxDepth int) ([]string, error
 }
 
 // detectStringSubtypes checks string-typed keys for HLL/protobuf/bitmap subtypes
-// using a pipeline GETRANGE of the first subtypeProbeBytes bytes — a full GET
-// would transfer entire (possibly huge) values on every scan page.
+// using a pipeline GETRANGE of the first subtypeProbeBytes bytes. Incomplete
+// binary probes that may be s2-compressed protobuf are re-fetched in full when
+// the key is under subtypeFullFetchMax so the list type is correct without
+// selecting the key.
 func (c *Client) detectStringSubtypes(keys []types.RedisKey) []types.RedisKey {
 	// Collect indices of string keys
 	var stringIdxs []int
@@ -441,6 +447,9 @@ func (c *Client) detectStringSubtypes(keys []types.RedisKey) []types.RedisKey {
 	}
 	_, _ = pipe.Exec(c.ctx)
 
+	// Ambiguous: probe filled the window and looked binary but was not yet
+	// classifiable (common for s2+protobuf — needs the whole blob).
+	var ambiguous []int
 	for j, idx := range stringIdxs {
 		val, err := getCmds[j].Result()
 		if err != nil {
@@ -459,9 +468,58 @@ func (c *Client) detectStringSubtypes(keys []types.RedisKey) []types.RedisKey {
 		if len(val) == subtypeProbeBytes {
 			binary = isBinaryPrefix(val)
 		}
-		// Incomplete probes of large binary values may be compressed protobuf
-		// that only decodes with the full payload — leave type as string.
-		if binary && len(val) < subtypeProbeBytes {
+		if !binary {
+			continue
+		}
+		if len(val) < subtypeProbeBytes {
+			// Complete short binary value → bitmap.
+			keys[idx].Type = types.KeyTypeBitmap
+			continue
+		}
+		ambiguous = append(ambiguous, idx)
+	}
+
+	if len(ambiguous) == 0 {
+		return keys
+	}
+
+	// Second pass: STRLEN, then full GET only for small-enough binary keys.
+	pipe = c.pipeline()
+	lenCmds := make([]*redis.IntCmd, len(ambiguous))
+	for j, idx := range ambiguous {
+		lenCmds[j] = pipe.StrLen(c.ctx, keys[idx].Key)
+	}
+	_, _ = pipe.Exec(c.ctx)
+
+	var fetchIdxs []int
+	for j, idx := range ambiguous {
+		n, err := lenCmds[j].Result()
+		if err != nil || n <= 0 || n > subtypeFullFetchMax {
+			continue
+		}
+		fetchIdxs = append(fetchIdxs, idx)
+	}
+	if len(fetchIdxs) == 0 {
+		return keys
+	}
+
+	pipe = c.pipeline()
+	fullCmds := make([]*redis.StringCmd, len(fetchIdxs))
+	for j, idx := range fetchIdxs {
+		fullCmds[j] = pipe.Get(c.ctx, keys[idx].Key)
+	}
+	_, _ = pipe.Exec(c.ctx)
+
+	for j, idx := range fetchIdxs {
+		val, err := fullCmds[j].Result()
+		if err != nil {
+			continue
+		}
+		if decode.LooksLikeProtobuf([]byte(val)) {
+			keys[idx].Type = types.KeyTypeProtobuf
+			continue
+		}
+		if isBinaryString(val) {
 			keys[idx].Type = types.KeyTypeBitmap
 		}
 	}
