@@ -15,7 +15,7 @@ var (
 	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39")).MarginBottom(1)
 	headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("15"))
 	normalStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("15"))
-	// selectedStyle matches phoenix TUI: bold dark text on accent cyan/blue band.
+	// selectedStyle: bold dark text on accent cyan/blue band for the active detail line.
 	selectedStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("16")).Background(lipgloss.Color("39"))
 	keyStyle      = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6"))
 	descStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("15"))
