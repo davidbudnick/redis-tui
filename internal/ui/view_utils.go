@@ -157,117 +157,105 @@ func formatPossibleJSON(s string) string {
 	return s
 }
 
-// Shared syntax-highlight styles (jq-style).
+// jq-style JSON highlight styles, allocated once instead of per call.
 var (
-	jsonKeyStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("39"))  // Blue for keys / field numbers
-	stringValueStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("34"))  // Green for strings
-	jsonNumberStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("33"))  // Yellow for numbers
-	boolStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("35"))  // Magenta for booleans
-	jsonNullStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("90"))  // Gray for null
-	bracketStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("15"))  // White for brackets
+	jsonKeyStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("39")) // Blue for keys
+	jsonStringStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("34")) // Green for string values
+	jsonNumberStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("33")) // Yellow for numbers
+	jsonBoolStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("35")) // Magenta for booleans
+	jsonNullStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("90")) // Gray for null
+	jsonBracketStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("15")) // White for brackets
 )
 
-// colorizeJSON adds jq-style syntax highlighting to JSON
+
+// Aliases used by protobuf highlighting and other callers.
+var (
+	stringValueStyle = jsonStringStyle
+	boolStyle        = jsonBoolStyle
+	bracketStyle     = jsonBracketStyle
+)
+
+// colorizeJSON adds jq-style syntax highlighting to JSON. It runs in a single
+// forward pass, tracking object/array nesting with a stack so deciding
+// key-vs-value context is O(1) per string token.
 func colorizeJSON(s string) string {
 	var result strings.Builder
-	inString := false
-	escaped := false
-	isKey := false
 	afterColon := false
+	// nesting stack: '{' for objects, '[' for arrays
+	var stack []byte
+
+	inArray := func() bool {
+		return len(stack) > 0 && stack[len(stack)-1] == '['
+	}
 
 	i := 0
 	for i < len(s) {
 		c := s[i]
 
-		if escaped {
-			result.WriteByte(c)
-			escaped = false
-			i++
-			continue
-		}
-
-		if c == '\\' && inString {
-			result.WriteByte(c)
-			escaped = true
-			i++
-			continue
-		}
-
 		if c == '"' {
-			if !inString {
-				inString = true
-				isKey = !afterColon && !isAfterArrayStart(s, i)
-				afterColon = false
-				end := findStringEnd(s, i+1)
-				if end > i {
-					str := s[i : end+1]
-					if isKey {
-						result.WriteString(jsonKeyStyle.Render(str))
-					} else {
-						result.WriteString(stringValueStyle.Render(str))
-					}
-					i = end + 1
-					inString = false
-					continue
+			end := findStringEnd(s, i+1)
+			if end > i {
+				str := s[i : end+1]
+				if !afterColon && !inArray() {
+					result.WriteString(jsonKeyStyle.Render(str))
+				} else {
+					result.WriteString(jsonStringStyle.Render(str))
 				}
+				afterColon = false
+				i = end + 1
+				continue
 			}
+			// Unterminated string: keep the quote and fall through to
+			// plain-byte handling for the remainder.
+			result.WriteByte(c)
 			i++
 			continue
 		}
 
-		if !inString {
-			if c == ':' {
-				result.WriteByte(c)
-				afterColon = true
-				i++
-				continue
+		switch {
+		case c == ':':
+			result.WriteByte(c)
+			afterColon = true
+			i++
+		case c == ',' || c == '\n':
+			result.WriteByte(c)
+			afterColon = false
+			i++
+		case c == '{' || c == '[':
+			result.WriteString(jsonBracketStyle.Render(string(c)))
+			stack = append(stack, c)
+			afterColon = false
+			i++
+		case c == '}' || c == ']':
+			result.WriteString(jsonBracketStyle.Render(string(c)))
+			if len(stack) > 0 {
+				stack = stack[:len(stack)-1]
 			}
-			if c == ',' || c == '\n' {
-				result.WriteByte(c)
-				afterColon = false
-				i++
-				continue
+			i++
+		case (c >= '0' && c <= '9') || c == '-':
+			end := i
+			for end < len(s) && (s[end] >= '0' && s[end] <= '9' || s[end] == '.' || s[end] == '-' || s[end] == 'e' || s[end] == 'E' || s[end] == '+') {
+				end++
 			}
-			if c == '{' || c == '}' || c == '[' || c == ']' {
-				result.WriteString(bracketStyle.Render(string(c)))
-				if c == '[' || c == '{' {
-					afterColon = false
-				}
-				i++
-				continue
-			}
-			if (c >= '0' && c <= '9') || c == '-' {
-				end := i
-				for end < len(s) && (s[end] >= '0' && s[end] <= '9' || s[end] == '.' || s[end] == '-' || s[end] == 'e' || s[end] == 'E' || s[end] == '+') {
-					end++
-				}
-				result.WriteString(jsonNumberStyle.Render(s[i:end]))
-				i = end
-				afterColon = false
-				continue
-			}
-			if strings.HasPrefix(s[i:], "true") {
-				result.WriteString(boolStyle.Render("true"))
-				i += 4
-				afterColon = false
-				continue
-			}
-			if strings.HasPrefix(s[i:], "false") {
-				result.WriteString(boolStyle.Render("false"))
-				i += 5
-				afterColon = false
-				continue
-			}
-			if strings.HasPrefix(s[i:], "null") {
-				result.WriteString(jsonNullStyle.Render("null"))
-				i += 4
-				afterColon = false
-				continue
-			}
+			result.WriteString(jsonNumberStyle.Render(s[i:end]))
+			i = end
+			afterColon = false
+		case strings.HasPrefix(s[i:], "true"):
+			result.WriteString(jsonBoolStyle.Render("true"))
+			i += 4
+			afterColon = false
+		case strings.HasPrefix(s[i:], "false"):
+			result.WriteString(jsonBoolStyle.Render("false"))
+			i += 5
+			afterColon = false
+		case strings.HasPrefix(s[i:], "null"):
+			result.WriteString(jsonNullStyle.Render("null"))
+			i += 4
+			afterColon = false
+		default:
+			result.WriteByte(c)
+			i++
 		}
-
-		result.WriteByte(c)
-		i++
 	}
 
 	return result.String()
@@ -285,49 +273,6 @@ func findStringEnd(s string, start int) int {
 		}
 	}
 	return -1
-}
-
-// isAfterArrayStart checks if we're inside an array (value context)
-func isAfterArrayStart(s string, pos int) bool {
-	for i := pos - 1; i >= 0; i-- {
-		c := s[i]
-		if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
-			continue
-		}
-		if c == '[' || c == ',' {
-			return isInArrayContext(s, i)
-		}
-		return false
-	}
-	return false
-}
-
-// isInArrayContext checks if position is within an array
-func isInArrayContext(s string, pos int) bool {
-	bracketCount := 0
-	braceCount := 0
-	for i := pos; i >= 0; i-- {
-		c := s[i]
-		switch c {
-		case ']':
-			bracketCount++
-		case '[':
-			if bracketCount > 0 {
-				bracketCount--
-			} else {
-				return true
-			}
-		case '}':
-			braceCount++
-		case '{':
-			if braceCount > 0 {
-				braceCount--
-			} else {
-				return false
-			}
-		}
-	}
-	return false
 }
 
 // colorizeProtobuf highlights schema-less protobuf text (field numbers, strings, numbers, braces).

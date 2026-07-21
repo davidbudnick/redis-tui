@@ -824,29 +824,10 @@ func TestScanKeys_DetectStringSubtypes_Bitmap(t *testing.T) {
 	}
 }
 
-func TestScanKeys_DetectStringSubtypes_Protobuf(t *testing.T) {
-	client, mr := setupTestClient(t)
-
-	var raw []byte
-	raw = append(raw, 0x0a, 0x04)
-	raw = append(raw, []byte("menu")...)
-	mr.Set("proto:detect", string(raw))
-
-	keys, _, err := client.ScanKeys("proto:detect", 0, 100)
-	if err != nil {
-		t.Fatalf("ScanKeys error: %v", err)
-	}
-	if len(keys) != 1 {
-		t.Fatalf("expected 1 key, got %d", len(keys))
-	}
-	if keys[0].Type != types.KeyTypeProtobuf {
-		t.Errorf("type = %q, want protobuf", keys[0].Type)
-	}
-}
-
 // ---------------------------------------------------------------------------
-// detectStringSubtypes — Get error path on a single string key. We use the
-// fake server to return one key from SCAN, "string" type, then have GET fail.
+// detectStringSubtypes — GetRange error path on a single string key. We use
+// the fake server to return one key from SCAN, "string" type, then have
+// GETRANGE fail.
 // ---------------------------------------------------------------------------
 
 func TestDetectStringSubtypes_GetError(t *testing.T) {
@@ -860,8 +841,8 @@ func TestDetectStringSubtypes_GetError(t *testing.T) {
 			return "+string\r\n"
 		case "TTL":
 			return ":-1\r\n"
-		case "GET":
-			// First GET (the one from detectStringSubtypes) errors out.
+		case "GETRANGE":
+			// First GETRANGE (the one from detectStringSubtypes) errors out.
 			ret := ""
 			firstGet.Do(func() { ret = "-ERR injected\r\n" })
 			if ret != "" {
@@ -951,5 +932,85 @@ func TestScanKeys_PlainZSetNotMisDetected(t *testing.T) {
 	}
 	if keys[0].Type != "zset" {
 		t.Errorf("type = %q, want zset", keys[0].Type)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// detectStringSubtypes — probe truncation branch (value >= subtypeProbeBytes).
+// ---------------------------------------------------------------------------
+
+func TestScanKeys_DetectStringSubtypes_LargeValues(t *testing.T) {
+	client, mr := setupTestClient(t)
+
+	// Large plain-text value: probe returns exactly subtypeProbeBytes bytes and
+	// the key must stay a plain string.
+	mr.Set("large:text", strings.Repeat("a", subtypeProbeBytes*2))
+
+	// Large binary value: incomplete probes stay "string" so large compressed
+	// protobuf blobs are not mislabeled as bitmaps. GetValue still classifies
+	// on open.
+	bin := make([]byte, subtypeProbeBytes*2)
+	for i := range bin {
+		bin[i] = 0xff
+	}
+	mr.Set("large:bin", string(bin))
+
+	// Short complete binary value still classifies as bitmap from the probe alone.
+	mr.Set("short:bin", string([]byte{0xff, 0xfe}))
+
+	keys, _, err := client.ScanKeys("*", 0, 100)
+	if err != nil {
+		t.Fatalf("ScanKeys error: %v", err)
+	}
+	byName := map[string]types.KeyType{}
+	for _, k := range keys {
+		byName[k.Key] = k.Type
+	}
+	if byName["large:text"] != "string" {
+		t.Errorf("large:text type = %q, want string", byName["large:text"])
+	}
+	if byName["large:bin"] != "string" {
+		t.Errorf("large:bin type = %q, want string (incomplete probe)", byName["large:bin"])
+	}
+	if byName["short:bin"] != "bitmap" {
+		t.Errorf("short:bin type = %q, want bitmap", byName["short:bin"])
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Benchmark: key-list scan over large string values. Before the GETRANGE
+// probe, every SCAN page pipelined a full GET of each string key, transferring
+// entire values just to sniff HLL/bitmap magic bytes.
+// ---------------------------------------------------------------------------
+
+func BenchmarkScanKeysLargeStringValues(b *testing.B) {
+	client, mr := setupBenchClient(b)
+
+	val := strings.Repeat("x", 512*1024) // 512KB per key
+	for i := 0; i < 100; i++ {
+		mr.Set(fmt.Sprintf("big:%03d", i), val)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, _, err := client.ScanKeys("big:*", 0, 100); err != nil {
+			b.Fatalf("ScanKeys: %v", err)
+		}
+	}
+}
+
+func TestScanKeys_DetectStringSubtypes_ProtobufProbe(t *testing.T) {
+	client, mr := setupTestClient(t)
+	// field 1 string "menu"
+	var raw []byte
+	raw = append(raw, 0x0a, 0x04)
+	raw = append(raw, []byte("menu")...)
+	mr.Set("proto:small", string(raw))
+	keys, _, err := client.ScanKeys("proto:small", 0, 10)
+	if err != nil {
+		t.Fatalf("ScanKeys: %v", err)
+	}
+	if len(keys) != 1 || keys[0].Type != types.KeyTypeProtobuf {
+		t.Fatalf("got %+v, want protobuf", keys)
 	}
 }

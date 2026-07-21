@@ -70,6 +70,7 @@ type RedisService interface {
 	ScanKeysWithRegex(regexPattern string, maxKeys int) ([]types.RedisKey, error)
 	FuzzySearchKeys(searchTerm string, maxKeys int) ([]types.RedisKey, error)
 	GetValue(key string) (types.RedisValue, error)
+	GetValuePreview(key string) (types.RedisValue, error)
 	DeleteKey(key string) error
 	DeleteKeys(keys ...string) (int64, error)
 	BulkDelete(pattern string) (int, error)

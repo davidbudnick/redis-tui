@@ -6,7 +6,7 @@ COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 LDFLAGS := -ldflags "-X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)"
 
-.PHONY: all build install clean test test-cover test-cover-check lint run start release snapshot demo \
+.PHONY: all build install clean test bench test-cover test-cover-check lint run start release snapshot demo \
 	docker-up docker-down docker-seed \
 	docker-up-standalone docker-up-standalone-stack docker-up-cluster docker-up-cluster-stack \
 	docker-down-standalone docker-down-standalone-stack docker-down-cluster docker-down-cluster-stack \
@@ -30,6 +30,10 @@ clean:
 ## Run tests
 test:
 	go test -v -race ./...
+
+## Run performance benchmarks (hot paths: key scans, preview fetches, rendering)
+bench:
+	go test -run XXX -bench . -benchmem -benchtime=5x -count=3 ./internal/redis/ ./internal/ui/
 
 ## Run tests with coverage
 test-cover:

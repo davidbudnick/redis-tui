@@ -80,6 +80,12 @@ func (m *MockRedisClient) GetValue(key string) (types.RedisValue, error) {
 	return value, nil
 }
 
+// GetValuePreview returns the stored value like GetValue; the mock does not
+// simulate truncation.
+func (m *MockRedisClient) GetValuePreview(key string) (types.RedisValue, error) {
+	return m.GetValue(key)
+}
+
 // ScanKeys returns keys matching a pattern from the mock store.
 func (m *MockRedisClient) ScanKeys(pattern string, cursor uint64, count int64) ([]types.RedisKey, uint64, error) {
 	if !m.connected {

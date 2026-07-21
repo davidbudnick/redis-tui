@@ -104,6 +104,10 @@ const (
 	scanBatchPrefixes int64 = 500
 	// maxRegexLen is the maximum allowed length for user-provided regex patterns.
 	maxRegexLen = 1024
+	// subtypeProbeBytes is how many leading bytes of a string value are fetched
+	// (via GETRANGE) to detect HLL/protobuf/bitmap subtypes without transferring
+	// the full value on every scan page.
+	subtypeProbeBytes = 256
 )
 
 // ScanKeysWithRegex scans keys using regex pattern with early termination.
@@ -416,8 +420,8 @@ func (c *Client) GetKeyPrefixes(separator string, maxDepth int) ([]string, error
 }
 
 // detectStringSubtypes checks string-typed keys for HLL/protobuf/bitmap subtypes
-// using a single pipeline GET. HYLL prefix → hyperloglog; s2/protobuf binary →
-// protobuf; remaining invalid UTF-8 → bitmap.
+// using a pipeline GETRANGE of the first subtypeProbeBytes bytes — a full GET
+// would transfer entire (possibly huge) values on every scan page.
 func (c *Client) detectStringSubtypes(keys []types.RedisKey) []types.RedisKey {
 	// Collect indices of string keys
 	var stringIdxs []int
@@ -433,7 +437,7 @@ func (c *Client) detectStringSubtypes(keys []types.RedisKey) []types.RedisKey {
 	pipe := c.pipeline()
 	getCmds := make([]*redis.StringCmd, len(stringIdxs))
 	for j, idx := range stringIdxs {
-		getCmds[j] = pipe.Get(c.ctx, keys[idx].Key)
+		getCmds[j] = pipe.GetRange(c.ctx, keys[idx].Key, 0, subtypeProbeBytes-1)
 	}
 	_, _ = pipe.Exec(c.ctx)
 
@@ -442,11 +446,22 @@ func (c *Client) detectStringSubtypes(keys []types.RedisKey) []types.RedisKey {
 		if err != nil {
 			continue
 		}
-		if len(val) >= 4 && val[:4] == "HYLL" {
+		if strings.HasPrefix(val, "HYLL") {
 			keys[idx].Type = types.KeyTypeHyperLogLog
-		} else if decode.LooksLikeProtobuf([]byte(val)) {
+			continue
+		}
+		if decode.LooksLikeProtobuf([]byte(val)) {
 			keys[idx].Type = types.KeyTypeProtobuf
-		} else if isBinaryString(val) {
+			continue
+		}
+		// A full-size probe may split a multi-byte UTF-8 rune at the cut point.
+		binary := isBinaryString(val)
+		if len(val) == subtypeProbeBytes {
+			binary = isBinaryPrefix(val)
+		}
+		// Incomplete probes of large binary values may be compressed protobuf
+		// that only decodes with the full payload — leave type as string.
+		if binary && len(val) < subtypeProbeBytes {
 			keys[idx].Type = types.KeyTypeBitmap
 		}
 	}

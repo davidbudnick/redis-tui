@@ -72,7 +72,7 @@ func (m Model) viewKeyDetail() string {
 		Padding(1, 2).
 		Width(boxWidth)
 
-	valueStr := m.detailValuePlainString()
+	valueStr := m.detailValueContent()
 	// Wrap to the box content width so scroll line counts match what is painted.
 	valueLines := wrapPlainLines(strings.Split(valueStr, "\n"), contentWidth)
 	maxVisible := detailMaxVisible(m.Height)
@@ -128,7 +128,7 @@ func (m Model) viewKeyDetail() string {
 }
 
 func (m Model) detailContentLines() int {
-	lines := wrapPlainLines(strings.Split(m.detailValuePlainString(), "\n"), detailContentWidth(detailBoxWidth(m.Width)))
+	lines := wrapPlainLines(strings.Split(m.detailValueContent(), "\n"), detailContentWidth(detailBoxWidth(m.Width)))
 	return len(lines)
 }
 
@@ -137,54 +137,67 @@ func (m Model) detailLastLine() int {
 	return max(m.detailContentLines()-1, 0)
 }
 
+// detailValueContent returns the formatted value block, using the per-load cache when set.
+func (m Model) detailValueContent() string {
+	if m.DetailRendered != "" {
+		return m.DetailRendered
+	}
+	return buildDetailValueContent(m.CurrentValue)
+}
+
 // detailValueString returns the detail body used by tests and line counting.
 func (m Model) detailValueString() string {
-	return m.detailValuePlainString()
+	return m.detailValueContent()
 }
 
 // detailValuePlainString builds the unstyled value body for the detail pane.
 func (m Model) detailValuePlainString() string {
+	return buildDetailValueContent(m.CurrentValue)
+}
+
+// buildDetailValueContent formats a Redis value for the key detail view.
+func buildDetailValueContent(value types.RedisValue) string {
 	var vc strings.Builder
-	switch m.CurrentValue.Type {
+	switch value.Type {
 	case types.KeyTypeString:
-		vc.WriteString(formatPossibleJSON(m.CurrentValue.StringValue))
+		vc.WriteString(formatPossibleJSON(value.StringValue))
 	case types.KeyTypeList:
-		if len(m.CurrentValue.ListValue) == 0 {
+		if len(value.ListValue) == 0 {
 			vc.WriteString("(empty list)")
 		} else {
-			for i, v := range m.CurrentValue.ListValue {
+			for i, v := range value.ListValue {
 				fmt.Fprintf(&vc, "%d. %s\n", i, formatPossibleJSON(v))
 			}
 		}
 	case types.KeyTypeSet:
-		if len(m.CurrentValue.SetValue) == 0 {
+		if len(value.SetValue) == 0 {
 			vc.WriteString("(empty set)")
 		} else {
-			for _, v := range m.CurrentValue.SetValue {
+			for _, v := range value.SetValue {
 				vc.WriteString("• ")
 				vc.WriteString(formatPossibleJSON(v))
 				vc.WriteString("\n")
 			}
 		}
 	case types.KeyTypeZSet:
-		if len(m.CurrentValue.ZSetValue) == 0 {
+		if len(value.ZSetValue) == 0 {
 			vc.WriteString("(empty sorted set)")
 		} else {
-			for _, v := range m.CurrentValue.ZSetValue {
+			for _, v := range value.ZSetValue {
 				fmt.Fprintf(&vc, "%.2f: %s\n", v.Score, formatPossibleJSON(v.Member))
 			}
 		}
 	case types.KeyTypeHash:
-		if len(m.CurrentValue.HashValue) == 0 {
+		if len(value.HashValue) == 0 {
 			vc.WriteString("(empty hash)")
 		} else {
-			hashKeys := make([]string, 0, len(m.CurrentValue.HashValue))
-			for k := range m.CurrentValue.HashValue {
+			hashKeys := make([]string, 0, len(value.HashValue))
+			for k := range value.HashValue {
 				hashKeys = append(hashKeys, k)
 			}
 			sort.Strings(hashKeys)
 			for _, k := range hashKeys {
-				v := m.CurrentValue.HashValue[k]
+				v := value.HashValue[k]
 				formattedValue := formatPossibleJSON(v)
 				if strings.Contains(formattedValue, "\n") {
 					fmt.Fprintf(&vc, "◆ %s:\n%s\n", k, formattedValue)
@@ -194,10 +207,10 @@ func (m Model) detailValuePlainString() string {
 			}
 		}
 	case types.KeyTypeStream:
-		if len(m.CurrentValue.StreamValue) == 0 {
+		if len(value.StreamValue) == 0 {
 			vc.WriteString("(empty stream)")
 		} else {
-			for _, entry := range m.CurrentValue.StreamValue {
+			for _, entry := range value.StreamValue {
 				jsonBytes, err := json.MarshalIndent(entry.Fields, "", "  ")
 				if err == nil {
 					fmt.Fprintf(&vc, "%s:\n%s\n", entry.ID, string(jsonBytes))
@@ -211,29 +224,29 @@ func (m Model) detailValuePlainString() string {
 			}
 		}
 	case types.KeyTypeJSON:
-		vc.WriteString(formatPossibleJSON(m.CurrentValue.JSONValue))
+		vc.WriteString(formatPossibleJSON(value.JSONValue))
 	case types.KeyTypeHyperLogLog:
-		fmt.Fprintf(&vc, "Estimated cardinality: %d", m.CurrentValue.HLLCount)
+		fmt.Fprintf(&vc, "Estimated cardinality: %d", value.HLLCount)
 	case types.KeyTypeProtobuf:
-		vc.WriteString(formatProtobufValue(m.CurrentValue))
+		vc.WriteString(formatProtobufValue(value))
 	case types.KeyTypeBitmap:
-		fmt.Fprintf(&vc, "Bit count: %d\n\n", m.CurrentValue.BitCount)
-		if len(m.CurrentValue.BitPositions) > 0 {
+		fmt.Fprintf(&vc, "Bit count: %d\n\n", value.BitCount)
+		if len(value.BitPositions) > 0 {
 			vc.WriteString("Set positions:\n")
-			for _, pos := range m.CurrentValue.BitPositions {
+			for _, pos := range value.BitPositions {
 				fmt.Fprintf(&vc, "  bit %d = 1\n", pos)
 			}
-			if m.CurrentValue.BitCount > int64(len(m.CurrentValue.BitPositions)) {
-				fmt.Fprintf(&vc, "  … and %d more\n", m.CurrentValue.BitCount-int64(len(m.CurrentValue.BitPositions)))
+			if value.BitCount > int64(len(value.BitPositions)) {
+				fmt.Fprintf(&vc, "  … and %d more\n", value.BitCount-int64(len(value.BitPositions)))
 			}
 		} else {
 			vc.WriteString("(all bits are 0)")
 		}
 	case types.KeyTypeGeo:
-		if len(m.CurrentValue.GeoValue) == 0 {
+		if len(value.GeoValue) == 0 {
 			vc.WriteString("(empty geo set)")
 		} else {
-			for _, g := range m.CurrentValue.GeoValue {
+			for _, g := range value.GeoValue {
 				fmt.Fprintf(&vc, "%s  (%.6f, %.6f)\n", g.Name, g.Longitude, g.Latitude)
 			}
 		}

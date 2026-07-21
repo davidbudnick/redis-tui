@@ -606,86 +606,6 @@ func TestGetValue_Bitmap(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// GetValue — Protobuf (raw + s2-compressed) branch
-// ---------------------------------------------------------------------------
-
-func TestGetValue_Protobuf(t *testing.T) {
-	client, mr := setupTestClient(t)
-
-	// field 1 string "menu-id", field 5 varint 7
-	var raw []byte
-	raw = append(raw, 0x0a, 0x07) // tag 1, len 7
-	raw = append(raw, []byte("menu-id")...)
-	raw = append(raw, 0x28, 0x07) // tag 5, varint 7
-
-	mr.Set("proto:raw", string(raw))
-	v, err := client.GetValue("proto:raw")
-	if err != nil {
-		t.Fatalf("GetValue error: %v", err)
-	}
-	if v.Type != types.KeyTypeProtobuf {
-		t.Fatalf("Type = %q, want %q", v.Type, types.KeyTypeProtobuf)
-	}
-	if v.DecodedFormat != "protobuf" {
-		t.Errorf("DecodedFormat = %q, want protobuf", v.DecodedFormat)
-	}
-	if !strings.Contains(v.DecodedValue, `1: "menu-id"`) {
-		t.Errorf("DecodedValue missing menu-id field:\n%s", v.DecodedValue)
-	}
-	if !strings.Contains(v.DecodedValue, "5: 7") {
-		t.Errorf("DecodedValue missing field 5:\n%s", v.DecodedValue)
-	}
-}
-
-func TestGetValue_Protobuf_S2(t *testing.T) {
-	client, mr := setupTestClient(t)
-
-	var raw []byte
-	raw = append(raw, 0x0a, 0x04)
-	raw = append(raw, []byte("abcd")...)
-	compressed := s2.Encode(nil, raw)
-
-	mr.Set("proto:s2", string(compressed))
-	v, err := client.GetValue("proto:s2")
-	if err != nil {
-		t.Fatalf("GetValue error: %v", err)
-	}
-	if v.Type != types.KeyTypeProtobuf {
-		t.Fatalf("Type = %q, want %q", v.Type, types.KeyTypeProtobuf)
-	}
-	if v.DecodedFormat != "s2+protobuf" {
-		t.Errorf("DecodedFormat = %q, want s2+protobuf", v.DecodedFormat)
-	}
-	if v.RawSize != len(compressed) {
-		t.Errorf("RawSize = %d, want %d", v.RawSize, len(compressed))
-	}
-	if v.DecodedSize != len(raw) {
-		t.Errorf("DecodedSize = %d, want %d", v.DecodedSize, len(raw))
-	}
-	if !strings.Contains(v.DecodedValue, `1: "abcd"`) {
-		t.Errorf("DecodedValue missing field:\n%s", v.DecodedValue)
-	}
-}
-
-func TestExtractBitPositions_Caps(t *testing.T) {
-	// 32 bytes all 0xff → 256 set bits; cap at 10.
-	raw := bytes.Repeat([]byte{0xff}, 32)
-	got := extractBitPositions(raw, 10)
-	if len(got) != 10 {
-		t.Fatalf("len = %d, want 10", len(got))
-	}
-	if got[0] != 0 || got[9] != 9 {
-		t.Errorf("positions = %v, want 0..9", got)
-	}
-	if extractBitPositions(raw, 0) != nil {
-		t.Error("max 0 should return nil")
-	}
-	if extractBitPositions(raw, -1) != nil {
-		t.Error("negative max should return nil")
-	}
-}
-
-// ---------------------------------------------------------------------------
 // GetValue — Geo branch
 // ---------------------------------------------------------------------------
 
@@ -1115,3 +1035,172 @@ func TestBulkDelete_LargeKeySet(t *testing.T) {
 		t.Errorf("expected 0 keys remaining, got %d", client.GetTotalKeys())
 	}
 }
+
+// ---------------------------------------------------------------------------
+// isBinaryPrefix — direct unit tests
+// ---------------------------------------------------------------------------
+
+func TestIsBinaryPrefix(t *testing.T) {
+	tests := []struct {
+		name string
+		s    string
+		want bool
+	}{
+		{"empty string", "", false},
+		{"valid utf-8 ascii", "hello", false},
+		{"valid utf-8 multibyte", "héllo", false},
+		// A 3-byte rune (é = 0xE4 0xB8 0xAD is 中) cut after 1 byte: not binary.
+		{"split rune one byte left", "hello\xe4", false},
+		// Cut after 2 of 3 bytes: not binary.
+		{"split rune two bytes left", "hello\xe4\xb8", false},
+		// 4-byte rune (😀 = 0xF0 0x9F 0x98 0x80) cut after 3 bytes: not binary.
+		{"split rune three bytes left", "hello\xf0\x9f\x98", false},
+		// Genuinely binary content in the middle survives trimming.
+		{"binary in middle", "a\xffb", true},
+		{"all binary", string([]byte{0xff, 0xfe, 0xfd, 0xfc}), true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isBinaryPrefix(tt.s)
+			if got != tt.want {
+				t.Errorf("isBinaryPrefix(%q) = %v, want %v", tt.s, got, tt.want)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// extractBitPositions — direct unit tests including the cap
+// ---------------------------------------------------------------------------
+
+func TestExtractBitPositions(t *testing.T) {
+	t.Run("positions from bytes", func(t *testing.T) {
+		// 0b10000001 -> bits 0 and 7; 0b01000000 -> bit 9
+		got := extractBitPositions([]byte{0x81, 0x40}, 10)
+		want := []int64{0, 7, 9}
+		if len(got) != len(want) {
+			t.Fatalf("positions = %v, want %v", got, want)
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("positions[%d] = %d, want %d", i, got[i], want[i])
+			}
+		}
+	})
+
+	t.Run("capped at max", func(t *testing.T) {
+		// 4 bytes of 0xFF = 32 set bits, capped at 5.
+		got := extractBitPositions([]byte{0xff, 0xff, 0xff, 0xff}, 5)
+		if len(got) != 5 {
+			t.Fatalf("len = %d, want 5", len(got))
+		}
+		if got[4] != 4 {
+			t.Errorf("last position = %d, want 4", got[4])
+		}
+	})
+
+	t.Run("empty value", func(t *testing.T) {
+		if got := extractBitPositions(nil, 5); len(got) != 0 {
+			t.Errorf("expected no positions, got %v", got)
+		}
+	})
+}
+
+func TestIsBinaryPrefixAndExtractMaxZero(t *testing.T) {
+	// incomplete multi-byte rune at end of prefix should not mark binary
+	if isBinaryPrefix("hello\xc2") {
+		t.Error("incomplete UTF-8 trail should not be binary")
+	}
+	// More than utf8.UTFMax-1 invalid trailing bytes remain after prefix trim.
+	if !isBinaryPrefix(string([]byte{0xff, 0xfe, 0xfd, 0xfc})) {
+		t.Error("invalid bytes should be binary")
+	}
+	if extractBitPositions([]byte{0xff}, 0) != nil {
+		t.Error("max 0 should return nil")
+	}
+}
+
+
+func TestGetValue_Protobuf(t *testing.T) {
+	client, mr := setupTestClient(t)
+
+	// field 1 string "menu-id", field 5 varint 7
+	var raw []byte
+	raw = append(raw, 0x0a, 0x07) // tag 1, len 7
+	raw = append(raw, []byte("menu-id")...)
+	raw = append(raw, 0x28, 0x07) // tag 5, varint 7
+
+	mr.Set("proto:raw", string(raw))
+	v, err := client.GetValue("proto:raw")
+	if err != nil {
+		t.Fatalf("GetValue error: %v", err)
+	}
+	if v.Type != types.KeyTypeProtobuf {
+		t.Fatalf("Type = %q, want %q", v.Type, types.KeyTypeProtobuf)
+	}
+	if v.DecodedFormat != "protobuf" {
+		t.Errorf("DecodedFormat = %q, want protobuf", v.DecodedFormat)
+	}
+	if !strings.Contains(v.DecodedValue, `1: "menu-id"`) {
+		t.Errorf("DecodedValue missing menu-id field:\n%s", v.DecodedValue)
+	}
+	if !strings.Contains(v.DecodedValue, "5: 7") {
+		t.Errorf("DecodedValue missing field 5:\n%s", v.DecodedValue)
+	}
+}
+
+
+func TestGetValue_Protobuf_S2(t *testing.T) {
+	client, mr := setupTestClient(t)
+
+	var raw []byte
+	raw = append(raw, 0x0a, 0x04)
+	raw = append(raw, []byte("abcd")...)
+	compressed := s2.Encode(nil, raw)
+
+	mr.Set("proto:s2", string(compressed))
+	v, err := client.GetValue("proto:s2")
+	if err != nil {
+		t.Fatalf("GetValue error: %v", err)
+	}
+	if v.Type != types.KeyTypeProtobuf {
+		t.Fatalf("Type = %q, want %q", v.Type, types.KeyTypeProtobuf)
+	}
+	if v.DecodedFormat != "s2+protobuf" {
+		t.Errorf("DecodedFormat = %q, want s2+protobuf", v.DecodedFormat)
+	}
+	if v.RawSize != len(compressed) {
+		t.Errorf("RawSize = %d, want %d", v.RawSize, len(compressed))
+	}
+	if v.DecodedSize != len(raw) {
+		t.Errorf("DecodedSize = %d, want %d", v.DecodedSize, len(raw))
+	}
+	if !strings.Contains(v.DecodedValue, `1: "abcd"`) {
+		t.Errorf("DecodedValue missing field:\n%s", v.DecodedValue)
+	}
+}
+
+
+func TestExtractBitPositions_Caps(t *testing.T) {
+	// 32 bytes all 0xff → 256 set bits; cap at 10.
+	raw := bytes.Repeat([]byte{0xff}, 32)
+	got := extractBitPositions(raw, 10)
+	if len(got) != 10 {
+		t.Fatalf("len = %d, want 10", len(got))
+	}
+	if got[0] != 0 || got[9] != 9 {
+		t.Errorf("positions = %v, want 0..9", got)
+	}
+	if extractBitPositions(raw, 0) != nil {
+		t.Error("max 0 should return nil")
+	}
+	if extractBitPositions(raw, -1) != nil {
+		t.Error("negative max should return nil")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// GetValue — Geo branch
+// ---------------------------------------------------------------------------
+
+

@@ -79,6 +79,19 @@ func TestMockRedisClient_Connected(t *testing.T) {
 		}
 	})
 
+	t.Run("GetValuePreview returns stored value", func(t *testing.T) {
+		val := types.RedisValue{Type: types.KeyTypeString, StringValue: "preview"}
+		m.SetKey("pvkey", val, types.KeyTypeString, 0)
+
+		got, err := m.GetValuePreview("pvkey")
+		if err != nil {
+			t.Fatalf("GetValuePreview error: %v", err)
+		}
+		if got.StringValue != "preview" {
+			t.Errorf("StringValue = %q, want %q", got.StringValue, "preview")
+		}
+	})
+
 	t.Run("ScanKeys with pattern", func(t *testing.T) {
 		m.SetKey("user:1", types.RedisValue{}, types.KeyTypeString, 0)
 		m.SetKey("user:2", types.RedisValue{}, types.KeyTypeString, 0)

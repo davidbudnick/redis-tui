@@ -9,6 +9,7 @@ Redis TUI Manager — a terminal user interface for managing Redis databases, bu
 ```bash
 make build        # Build binary to bin/redis-tui
 make test         # Run tests: go test -v ./...
+make bench        # Hot-path benchmarks (key scans, preview fetches, rendering)
 make test-cover   # Tests with coverage report
 make lint         # Run go vet
 make fmt          # Format code with go fmt

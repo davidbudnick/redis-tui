@@ -49,6 +49,8 @@ type RedisValue struct {
 	// RawSize / DecodedSize track original vs decompressed payload sizes.
 	RawSize     int
 	DecodedSize int
+	Truncated   bool  // value is a bounded preview, not the full value
+	TotalCount  int64 // full length/cardinality when Truncated is set
 }
 
 // GeoMember represents a geospatial member with coordinates

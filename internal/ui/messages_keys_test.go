@@ -382,3 +382,27 @@ func TestHandleBatchTTLSetMsg(t *testing.T) {
 		}
 	})
 }
+
+func TestHandleKeyPreviewLoadedMsg_CachedTypes(t *testing.T) {
+	m, _, _ := newTestModel(t)
+	m.Keys = []types.RedisKey{{Key: "s", Type: types.KeyTypeString}}
+	m.SelectedKeyIdx = 0
+	msg := types.KeyPreviewLoadedMsg{Key: "s", Value: types.RedisValue{Type: types.KeyTypeString, StringValue: `{"a":1}`}}
+	got, _ := m.handleKeyPreviewLoadedMsg(msg)
+	model := got.(Model)
+	if model.PreviewRendered == "" {
+		t.Error("expected PreviewRendered for string JSON")
+	}
+	msg = types.KeyPreviewLoadedMsg{Key: "s", Value: types.RedisValue{Type: types.KeyTypeJSON, JSONValue: `{"b":2}`}}
+	got, _ = model.handleKeyPreviewLoadedMsg(msg)
+	model = got.(Model)
+	if model.PreviewRendered == "" {
+		t.Error("expected PreviewRendered for JSON")
+	}
+	msg = types.KeyPreviewLoadedMsg{Key: "s", Value: types.RedisValue{Type: types.KeyTypeProtobuf, DecodedValue: "1: 1\n", DecodedFormat: "protobuf"}}
+	got, _ = model.handleKeyPreviewLoadedMsg(msg)
+	model = got.(Model)
+	if model.PreviewRendered == "" || !strings.Contains(model.PreviewRendered, "protobuf") {
+		t.Errorf("expected protobuf preview render, got %q", model.PreviewRendered)
+	}
+}

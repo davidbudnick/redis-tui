@@ -646,3 +646,37 @@ func TestViewAddKey(t *testing.T) {
 		assertNonEmpty(t, "narrow", m.viewAddKey())
 	})
 }
+
+func TestDetailValueContentCache(t *testing.T) {
+	m, _, _ := newTestModel(t)
+	m.CurrentValue = types.RedisValue{Type: types.KeyTypeString, StringValue: "hi"}
+	m.DetailRendered = ""
+	if got := m.detailValueContent(); got == "" {
+		t.Error("expected uncached content")
+	}
+	_ = m.detailValuePlainString()
+	m.DetailRendered = "CACHED"
+	if m.detailValueContent() != "CACHED" {
+		t.Error("expected cache hit")
+	}
+}
+
+func TestPreviewFormattedAndTruncated(t *testing.T) {
+	m, _, _ := newTestModel(t)
+	m.Keys = []types.RedisKey{{Key: "k", Type: types.KeyTypeList}}
+	m.SelectedKeyIdx = 0
+	m.PreviewKey = "k"
+	m.PreviewValue = types.RedisValue{Type: types.KeyTypeList, ListValue: []string{"a"}, Truncated: true, TotalCount: 99}
+	m.PreviewRendered = ""
+	if m.previewFormatted("x") == "" {
+		t.Error("fallback format")
+	}
+	m.PreviewRendered = "PRE"
+	if m.previewFormatted("x") != "PRE" {
+		t.Error("cache hit")
+	}
+	out := m.buildPreviewPanel(40)
+	if !strings.Contains(out, "99") {
+		t.Errorf("expected truncated total, got %q", out)
+	}
+}
