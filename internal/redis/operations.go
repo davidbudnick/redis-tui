@@ -9,8 +9,10 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// maxBitPositions caps how many set-bit offsets we materialize for display.
-const maxBitPositions = 256
+// maxBitPositions caps how many set-bit positions are extracted from a bitmap
+// value — the UI displays only a screenful, and an unbounded extraction of a
+// large bitmap could allocate millions of entries.
+const maxBitPositions = 1024
 
 // GetValue retrieves the value for a key
 func (c *Client) GetValue(key string) (types.RedisValue, error) {
@@ -181,6 +183,24 @@ func extractBitPositions(val []byte, max int) []int64 {
 		}
 	}
 	return positions
+}
+
+// isBinaryPrefix is like isBinaryString but for a value prefix (e.g. from
+// GETRANGE): a multi-byte UTF-8 rune split at the cut point must not count as
+// binary, so up to utf8.UTFMax-1 trailing bytes of an incomplete rune are
+// trimmed before validating.
+func isBinaryPrefix(s string) bool {
+	for i := 0; i < utf8.UTFMax-1 && len(s) > 0; i++ {
+		if utf8.ValidString(s) {
+			return false
+		}
+		r, size := utf8.DecodeLastRuneInString(s)
+		if r != utf8.RuneError || size != 1 {
+			break
+		}
+		s = s[:len(s)-1]
+	}
+	return isBinaryString(s)
 }
 
 // JSONGet retrieves a JSON value from a RedisJSON key

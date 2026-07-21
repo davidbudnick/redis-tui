@@ -36,7 +36,7 @@ func (c *Commands) LoadKeyPreview(key string) tea.Cmd {
 		if c.redis == nil {
 			return types.KeyPreviewLoadedMsg{Err: nil}
 		}
-		value, err := c.redis.GetValue(key)
+		value, err := c.redis.GetValuePreview(key)
 		return types.KeyPreviewLoadedMsg{Key: key, Value: value, Err: err}
 	}
 }

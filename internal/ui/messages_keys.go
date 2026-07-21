@@ -40,6 +40,7 @@ func (m Model) handleKeyValueLoadedMsg(msg types.KeyValueLoadedMsg) (tea.Model, 
 		m.StatusMsg = "Error: " + msg.Err.Error()
 	} else {
 		m.CurrentValue = msg.Value
+		m.DetailRendered = buildDetailValueContent(msg.Value)
 		m.DetailScroll = 0
 		m.DetailCursor = 0
 		// On-demand type resolution: fill in type if it was not fetched during scan,
@@ -60,6 +61,16 @@ func (m Model) handleKeyPreviewLoadedMsg(msg types.KeyPreviewLoadedMsg) (tea.Mod
 	if len(m.Keys) > 0 && m.SelectedKeyIdx < len(m.Keys) && m.Keys[m.SelectedKeyIdx].Key == msg.Key {
 		m.PreviewKey = msg.Key
 		m.PreviewValue = msg.Value
+		// Pre-format string/JSON/protobuf previews once — must not run per frame.
+		m.PreviewRendered = ""
+		switch msg.Value.Type {
+		case types.KeyTypeString:
+			m.PreviewRendered = formatPossibleJSON(msg.Value.StringValue)
+		case types.KeyTypeJSON:
+			m.PreviewRendered = formatPossibleJSON(msg.Value.JSONValue)
+		case types.KeyTypeProtobuf:
+			m.PreviewRendered = formatProtobufValue(msg.Value)
+		}
 		// On-demand type resolution: fill in type if it was not fetched during scan,
 		// or update when GetValue detected a subtype (e.g. string→hyperloglog)
 		if msg.Value.Type != "" && m.Keys[m.SelectedKeyIdx].Type != msg.Value.Type {

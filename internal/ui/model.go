@@ -151,6 +151,11 @@ type Model struct {
 	DetailScroll  int // viewport top line in the detail value body
 	DetailCursor  int // selected line in the detail value body (blue band)
 
+	// Cached formatted renders, computed once when a value is loaded so the
+	// 1 Hz TTL tick does not re-pretty-print / re-colorize large payloads.
+	DetailRendered  string
+	PreviewRendered string
+
 	// Live metrics dashboard
 	LiveMetrics       *types.LiveMetrics
 	LiveMetricsActive bool

@@ -361,54 +361,6 @@ func TestFindStringEnd(t *testing.T) {
 	}
 }
 
-func TestIsAfterArrayStart(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		pos      int
-		expected bool
-	}{
-		{"after open bracket", `["hello"]`, 1, true},
-		{"after comma in array", `["a", "b"]`, 5, true},
-		{"after open brace", `{"key": "val"}`, 8, false},
-		{"after colon", `{"key": "val"}`, 8, false},
-		{"beginning of string", `"hello"`, 0, false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := isAfterArrayStart(tt.input, tt.pos)
-			if got != tt.expected {
-				t.Errorf("isAfterArrayStart(%q, %d) = %v, want %v", tt.input, tt.pos, got, tt.expected)
-			}
-		})
-	}
-}
-
-func TestIsInArrayContext(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		pos      int
-		expected bool
-	}{
-		{"inside array", `["a", "b"]`, 5, true},
-		{"inside object", `{"a": "b"}`, 5, false},
-		{"nested array in object", `{"k": ["a", "b"]}`, 10, true},
-		{"nested object in array", `[{"a": "b"}]`, 5, false},
-		{"at array start", `["a"]`, 0, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := isInArrayContext(tt.input, tt.pos)
-			if got != tt.expected {
-				t.Errorf("isInArrayContext(%q, %d) = %v, want %v", tt.input, tt.pos, got, tt.expected)
-			}
-		})
-	}
-}
-
 func TestFormatPossibleJSON(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -464,5 +416,20 @@ func TestFormatPossibleJSON_NoPanic(t *testing.T) {
 			// Should not panic
 			_ = formatPossibleJSON(input)
 		})
+	}
+}
+
+func TestColorizeJSON_LinearPaths(t *testing.T) {
+	cases := []string{
+		`{"a":1,"b":true,"c":null,"d":false}`,
+		`[1,2,"x"]`,
+		`{"k":"unterminated`,
+		`{"n":-1.5e+2}`,
+	}
+	for _, c := range cases {
+		out := colorizeJSON(c)
+		if out == "" {
+			t.Errorf("empty colorize for %q", c)
+		}
 	}
 }

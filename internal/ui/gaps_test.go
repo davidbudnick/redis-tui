@@ -274,33 +274,6 @@ func TestSanitizeBinaryString_HighRange(t *testing.T) {
 
 // ---- colorizeJSON various paths ----
 
-func TestColorizeJSON_VariousPaths(t *testing.T) {
-	inputs := []string{
-		`{"key":"value","num":42,"neg":-3.14,"bool":true,"false":false,"null":null,"arr":[1,2,3]}`,
-		`{"escaped":"he said \"hi\""}`,
-		`{"exp":1.5e10}`,
-		`[1, 2, 3]`,
-		`{`, // unclosed
-		`"just a string"`,
-	}
-	for _, in := range inputs {
-		_ = colorizeJSON(in)
-	}
-}
-
-// ---- isInArrayContext with nested brackets ----
-
-func TestIsInArrayContext_NestedBrackets(t *testing.T) {
-	// Forces bracketCount > 0 path: position after a nested ] that needs bracketCount decrement
-	_ = isInArrayContext(`[[1]]`, 3) // inside outer array, after inner close
-	// Forces braceCount > 0 path
-	_ = isInArrayContext(`[{}]`, 2) // inside array, after brace close
-	_ = isInArrayContext(`[]`, 0)   // array start
-	_ = isInArrayContext(`{}`, 0)   // object start
-}
-
-// ---- parseLogEntry non-RFC3339 time fallback ----
-
 func TestParseLogEntry_NonRFC3339Time(t *testing.T) {
 	input := `{"time":"not-a-timestamp","level":"INFO","msg":"hello"}`
 	entry := parseLogEntry(input)
@@ -386,21 +359,6 @@ func TestColorizeJSON_EscapedInString(t *testing.T) {
 }
 
 // ---- colorizeJSON unterminated quote fallthrough ----
-
-func TestColorizeJSON_UnterminatedQuote(t *testing.T) {
-	_ = colorizeJSON(`{"unterm`)
-	_ = colorizeJSON(`"`)
-}
-
-// ---- isInArrayContext bare value (no brackets) returns false ----
-
-func TestIsInArrayContext_BareValue(t *testing.T) {
-	if isInArrayContext("123", 2) {
-		t.Error("expected false for bare value")
-	}
-}
-
-// ---- Pattern debounce cmd inner closure ----
 
 func TestHandleKeysScreen_DebounceClosureFires(t *testing.T) {
 	m, _, _ := newTestModel(t)

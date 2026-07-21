@@ -93,7 +93,20 @@ func (m Model) buildPreviewPanel(width int) string {
 	valueContent := m.formatPreviewValue(width, maxLines)
 	b.WriteString(valueContent)
 
+	if m.PreviewValue.Truncated {
+		b.WriteString("\n")
+		b.WriteString(dimStyle.Render(fmt.Sprintf("(preview — %d total)", m.PreviewValue.TotalCount)))
+	}
+
 	return b.String()
+}
+
+// previewFormatted returns the pre-rendered preview content when cached.
+func (m Model) previewFormatted(raw string) string {
+	if m.PreviewRendered != "" {
+		return m.PreviewRendered
+	}
+	return formatPossibleJSON(raw)
 }
 
 func (m Model) formatPreviewValue(maxWidth, maxLines int) string {
@@ -104,8 +117,7 @@ func (m Model) formatPreviewValue(maxWidth, maxLines int) string {
 
 	switch m.PreviewValue.Type {
 	case types.KeyTypeString:
-		value := m.PreviewValue.StringValue
-		formatted := formatPossibleJSON(value)
+		formatted := m.previewFormatted(m.PreviewValue.StringValue)
 
 		// Split into lines and limit
 		valueLines := strings.Split(formatted, "\n")
@@ -250,8 +262,7 @@ func (m Model) formatPreviewValue(maxWidth, maxLines int) string {
 		}
 
 	case types.KeyTypeJSON:
-		value := m.PreviewValue.JSONValue
-		formatted := formatPossibleJSON(value)
+		formatted := m.previewFormatted(m.PreviewValue.JSONValue)
 
 		valueLines := strings.Split(formatted, "\n")
 		for i, line := range valueLines {
