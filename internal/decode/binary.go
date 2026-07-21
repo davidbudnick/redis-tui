@@ -28,6 +28,13 @@ const (
 	maxDepth = 8
 	// maxFields caps how many fields are rendered per message level.
 	maxFields = 5000
+	// maxFieldNumber is the protobuf wire max field number (2^29 - 1).
+	maxFieldNumber = 536870911
+	// Wire types kept as uint64 so tag bits need no narrowing casts (gosec G115).
+	wireVarint  uint64 = 0
+	wireFixed64 uint64 = 1
+	wireBytes   uint64 = 2
+	wireFixed32 uint64 = 5
 )
 
 // TryBinary attempts s2 decompression then schema-less protobuf decoding.
@@ -80,6 +87,16 @@ func isValidProtobuf(b []byte) bool {
 	return consumeMessage(b) == len(b)
 }
 
+// splitTag extracts field number and wire type from a protobuf tag without narrowing casts.
+func splitTag(tag uint64) (fieldNum, wireType uint64, ok bool) {
+	fieldNum = tag >> 3
+	wireType = tag & 7
+	if fieldNum < 1 || fieldNum > maxFieldNumber {
+		return 0, 0, false
+	}
+	return fieldNum, wireType, true
+}
+
 // consumeMessage returns bytes consumed if b is a valid message, else -1.
 func consumeMessage(b []byte) int {
 	i := 0
@@ -90,19 +107,18 @@ func consumeMessage(b []byte) int {
 			return -1
 		}
 		i += n
-		num := protowire.Number(tag >> 3)
-		wt := protowire.Type(tag & 7)
-		if num < 1 {
+		_, wt, ok := splitTag(tag)
+		if !ok {
 			return -1
 		}
 		switch wt {
-		case protowire.VarintType:
+		case wireVarint:
 			_, n = protowire.ConsumeVarint(b[i:])
-		case protowire.Fixed64Type:
+		case wireFixed64:
 			_, n = protowire.ConsumeFixed64(b[i:])
-		case protowire.BytesType:
+		case wireBytes:
 			_, n = protowire.ConsumeBytes(b[i:])
-		case protowire.Fixed32Type:
+		case wireFixed32:
 			_, n = protowire.ConsumeFixed32(b[i:])
 		default:
 			// Groups (3/4) and unknown wire types are rejected.
@@ -145,23 +161,25 @@ func writeMessage(sb *strings.Builder, b []byte, depth int) {
 		}
 		tag, n := protowire.ConsumeVarint(b[i:])
 		i += n
-		num := protowire.Number(tag >> 3)
-		wt := protowire.Type(tag & 7)
+		num, wt, ok := splitTag(tag)
+		if !ok {
+			return
+		}
 
 		switch wt {
-		case protowire.VarintType:
+		case wireVarint:
 			v, n := protowire.ConsumeVarint(b[i:])
 			i += n
 			fmt.Fprintf(sb, "%s%d: %d\n", indent(depth), num, v)
-		case protowire.Fixed64Type:
+		case wireFixed64:
 			v, n := protowire.ConsumeFixed64(b[i:])
 			i += n
 			fmt.Fprintf(sb, "%s%d: 0x%x\n", indent(depth), num, v)
-		case protowire.BytesType:
+		case wireBytes:
 			v, n := protowire.ConsumeBytes(b[i:])
 			i += n
-			writeBytesField(sb, int(num), v, depth)
-		case protowire.Fixed32Type:
+			writeBytesField(sb, num, v, depth)
+		case wireFixed32:
 			v, n := protowire.ConsumeFixed32(b[i:])
 			i += n
 			fmt.Fprintf(sb, "%s%d: 0x%x\n", indent(depth), num, v)
@@ -171,7 +189,7 @@ func writeMessage(sb *strings.Builder, b []byte, depth int) {
 }
 
 // writeBytesField renders a length-delimited field as string, nested message, or bytes.
-func writeBytesField(sb *strings.Builder, num int, v []byte, depth int) {
+func writeBytesField(sb *strings.Builder, num uint64, v []byte, depth int) {
 	if isPrintableUTF8(v) {
 		fmt.Fprintf(sb, "%s%d: %q\n", indent(depth), num, string(v))
 		return
