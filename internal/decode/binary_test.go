@@ -150,6 +150,34 @@ func TestConsumeMessage_Errors(t *testing.T) {
 	}
 }
 
+func TestSplitTag(t *testing.T) {
+	num, wt, ok := splitTag(0x08) // field 1, varint
+	if !ok || num != 1 || wt != wireVarint {
+		t.Errorf("splitTag(0x08) = %d %d %v", num, wt, ok)
+	}
+	if _, _, ok := splitTag(0); ok {
+		t.Error("field 0 should fail")
+	}
+	// field number past max via high bits
+	if _, _, ok := splitTag((maxFieldNumber + 1) << 3); ok {
+		t.Error("oversized field should fail")
+	}
+}
+
+func TestWriteMessage_InvalidTagStops(t *testing.T) {
+	// After isValidProtobuf passed, writeMessage trusts tags; call it with
+	// a crafted buffer that has a valid first field then a field-0 tag so
+	// splitTag fails mid-message (defensive early return).
+	var b []byte
+	b = append(b, encodeVarintField(1, 1)...)
+	b = append(b, 0x00) // field 0 tag
+	var sb strings.Builder
+	writeMessage(&sb, b, 0)
+	if !strings.Contains(sb.String(), "1: 1") {
+		t.Errorf("expected first field rendered, got %q", sb.String())
+	}
+}
+
 func TestFormatProtobuf_FixedTypesAndOpaque(t *testing.T) {
 	var b []byte
 	b = protowire.AppendTag(b, 1, protowire.Fixed64Type)
