@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/davidbudnick/redis-tui/internal/types"
+	"github.com/klauspost/compress/s2"
 	goredis "github.com/redis/go-redis/v9"
 )
 
@@ -1012,5 +1013,51 @@ func TestScanKeys_DetectStringSubtypes_ProtobufProbe(t *testing.T) {
 	}
 	if len(keys) != 1 || keys[0].Type != types.KeyTypeProtobuf {
 		t.Fatalf("got %+v, want protobuf", keys)
+	}
+}
+
+// BenchmarkScanKeysProtobufMenus measures SCAN+subtype detection over many
+// s2-compressed protobuf menu payloads (GETRANGE probe path, not full GET).
+func BenchmarkScanKeysProtobufMenus(b *testing.B) {
+	client, mr := setupBenchClient(b)
+
+	// Build a medium protobuf menu-ish message and s2-compress it.
+	var raw []byte
+	// field 1: menu id
+	raw = append(raw, 0x0a, 0x14)
+	raw = append(raw, []byte("rst-demo:DELIVERY!!!!")[:20]...)
+	// several nested category messages as length-delimited field 5
+	for i := 0; i < 50; i++ {
+		var cat []byte
+		name := fmt.Sprintf("Category-%02d-with-padding", i)
+		cat = append(cat, 0x0a, byte(len(name)))
+		cat = append(cat, name...)
+		cat = append(cat, 0x20, 0x01) // field 4 varint 1
+		raw = append(raw, 0x2a, byte(len(cat)))
+		raw = append(raw, cat...)
+	}
+	// pad to ~200KB of proto then compress
+	pad := make([]byte, 180*1024)
+	for i := range pad {
+		pad[i] = byte(i)
+	}
+	// length-delimited field 10 with pad
+	// use multi-byte varint length carefully - simpler: append repeated string fields
+	for i := 0; i < 2000; i++ {
+		s := fmt.Sprintf("item-description-padding-%04d-xxxxxxxx", i)
+		raw = append(raw, 0x12, byte(len(s)))
+		raw = append(raw, s...)
+	}
+	compressed := s2.Encode(nil, raw)
+	for i := 0; i < 50; i++ {
+		mr.Set(fmt.Sprintf("menu:v4:rst-%02d:DELIVERY", i), string(compressed))
+	}
+
+	b.ReportMetric(float64(len(compressed)), "bytes/key")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, _, err := client.ScanKeys("menu:v4:*", 0, 100); err != nil {
+			b.Fatalf("ScanKeys: %v", err)
+		}
 	}
 }

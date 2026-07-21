@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -678,5 +679,56 @@ func TestPreviewFormattedAndTruncated(t *testing.T) {
 	out := m.buildPreviewPanel(40)
 	if !strings.Contains(out, "99") {
 		t.Errorf("expected truncated total, got %q", out)
+	}
+}
+
+// BenchmarkViewKeyDetailLargeJSON measures one cached detail render frame.
+func BenchmarkViewKeyDetailLargeJSON(b *testing.B) {
+	var sb strings.Builder
+	sb.WriteString(`{"items": [`)
+	for i := 0; i < 5000; i++ {
+		if i > 0 {
+			sb.WriteString(",")
+		}
+		sb.WriteString(`{"id": 12345, "name": "some-item-name", "active": true, "score": 98.6, "tag": null}`)
+	}
+	sb.WriteString(`]}`)
+
+	m := NewModel()
+	m.Width = 120
+	m.Height = 40
+	m.CurrentKey = &types.RedisKey{Key: "big:json", Type: types.KeyTypeString}
+	m.CurrentValue = types.RedisValue{Type: types.KeyTypeString, StringValue: sb.String()}
+	m.DetailRendered = buildDetailValueContent(m.CurrentValue)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = m.viewKeyDetail()
+	}
+}
+
+// BenchmarkViewKeyDetailProtobuf measures a cached detail frame for a large
+// decoded protobuf body (typical after s2 decompress + decode_raw).
+func BenchmarkViewKeyDetailProtobuf(b *testing.B) {
+	var body strings.Builder
+	for i := 0; i < 2000; i++ {
+		fmt.Fprintf(&body, "5: {\n  1: \"cat:%d\"\n  2: \"Category Name %d\"\n  4: 1\n  5: 1\n  6: 1\n  7: %d\n}\n", i, i, i)
+	}
+	m := NewModel()
+	m.Width = 120
+	m.Height = 40
+	m.CurrentKey = &types.RedisKey{Key: "menu:v4:demo", Type: types.KeyTypeProtobuf}
+	m.CurrentValue = types.RedisValue{
+		Type:          types.KeyTypeProtobuf,
+		DecodedFormat: "s2+protobuf",
+		DecodedValue:  body.String(),
+		RawSize:       200_000,
+		DecodedSize:   800_000,
+	}
+	m.DetailRendered = buildDetailValueContent(m.CurrentValue)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = m.viewKeyDetail()
 	}
 }
