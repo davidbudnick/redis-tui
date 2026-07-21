@@ -90,7 +90,7 @@ func (m Model) viewKeyDetail() string {
 	for i, line := range visible {
 		abs := displayScroll + i
 		if abs == m.DetailCursor {
-			// Phoenix-style full-width blue selection band (plain text, high contrast).
+			// Full-width blue selection band (plain text, high contrast).
 			plain := padRight(truncateRunes(line, contentWidth), contentWidth)
 			display.WriteString(selectedStyle.Render(plain))
 		} else if m.CurrentValue.Type == types.KeyTypeProtobuf {
