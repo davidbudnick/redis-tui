@@ -433,3 +433,20 @@ func TestColorizeJSON_LinearPaths(t *testing.T) {
 		}
 	}
 }
+
+// BenchmarkColorizeJSONLarge guards against colorizeJSON regressing to
+// super-linear behavior on large JSON arrays of strings.
+func BenchmarkColorizeJSONLarge(b *testing.B) {
+	var sb strings.Builder
+	sb.WriteString("[\n")
+	for i := 0; i < 20000; i++ {
+		sb.WriteString("  \"element-number-with-some-padding-0123456789\",\n")
+	}
+	sb.WriteString("  \"last\"\n]")
+	s := sb.String()
+	b.SetBytes(int64(len(s)))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = colorizeJSON(s)
+	}
+}

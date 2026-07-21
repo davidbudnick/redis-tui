@@ -1204,3 +1204,53 @@ func TestExtractBitPositions_Caps(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 
+
+// BenchmarkGetValueProtobufS2 measures full decode of a large s2+protobuf menu value.
+func BenchmarkGetValueProtobufS2(b *testing.B) {
+	client, mr := setupBenchClient(b)
+
+	var raw []byte
+	raw = append(raw, 0x0a, 0x14)
+	raw = append(raw, []byte("rst-demo:DELIVERY!!!!")[:20]...)
+	for i := 0; i < 3000; i++ {
+		s := fmt.Sprintf("item-description-padding-%04d-xxxxxxxx", i)
+		raw = append(raw, 0x12, byte(len(s)))
+		raw = append(raw, s...)
+	}
+	compressed := s2.Encode(nil, raw)
+	mr.Set("menu:big", string(compressed))
+
+	b.ReportMetric(float64(len(compressed)), "raw-bytes")
+	b.ReportMetric(float64(len(raw)), "decoded-bytes")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		v, err := client.GetValue("menu:big")
+		if err != nil {
+			b.Fatalf("GetValue: %v", err)
+		}
+		if v.Type != types.KeyTypeProtobuf {
+			b.Fatalf("type = %s, want protobuf", v.Type)
+		}
+	}
+}
+
+// BenchmarkGetValuePreviewProtobufS2 measures bounded preview of s2+protobuf.
+func BenchmarkGetValuePreviewProtobufS2(b *testing.B) {
+	client, mr := setupBenchClient(b)
+
+	var raw []byte
+	for i := 0; i < 3000; i++ {
+		s := fmt.Sprintf("item-description-padding-%04d-xxxxxxxx", i)
+		raw = append(raw, 0x12, byte(len(s)))
+		raw = append(raw, s...)
+	}
+	compressed := s2.Encode(nil, raw)
+	mr.Set("menu:big", string(compressed))
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := client.GetValuePreview("menu:big"); err != nil {
+			b.Fatalf("GetValuePreview: %v", err)
+		}
+	}
+}

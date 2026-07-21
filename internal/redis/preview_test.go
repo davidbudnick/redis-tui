@@ -560,3 +560,44 @@ func BenchmarkPreviewFetch(b *testing.B) {
 		}
 	})
 }
+
+func BenchmarkCompareListFetch(b *testing.B) {
+	client, mr := setupBenchClient(b)
+	item := strings.Repeat("v", 64)
+	for i := 0; i < 100_000; i++ {
+		mr.RPush("biglist", item)
+	}
+	b.Run("GetValue_full", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			if _, err := client.GetValue("biglist"); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("GetValuePreview_bounded", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			if _, err := client.GetValuePreview("biglist"); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
+
+func BenchmarkCompareStringFetch(b *testing.B) {
+	client, mr := setupBenchClient(b)
+	mr.Set("bigstring", strings.Repeat("x", 8*1024*1024))
+	b.Run("GetValue_full", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			if _, err := client.GetValue("bigstring"); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("GetValuePreview_bounded", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			if _, err := client.GetValuePreview("bigstring"); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
