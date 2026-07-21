@@ -37,7 +37,7 @@ internal/
 
 ## Code Conventions
 
-- **Go version**: 1.26.4 (set in go.mod)
+- **Go version**: 1.26.5 (set in go.mod)
 - **Package names**: lowercase, single word (`cmd`, `redis`, `types`, `db`, `ui`)
 - **Receivers**: short names (`c *Client`, `m Model`, `cfg *Config`)
 - **Message types**: PascalCase with `Msg` suffix (`ConnectedMsg`, `KeysLoadedMsg`)
