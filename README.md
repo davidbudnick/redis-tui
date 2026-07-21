@@ -41,7 +41,8 @@ go install github.com/davidbudnick/redis-tui@latest
 
 - **Key browser** with pattern filtering, regex, and fuzzy search
 - **Bounded previews** — the preview panel fetches at most 100 items / 64 KB per key (marked "(preview — N total)" when truncated), so browsing huge keys never blocks the Redis server
-- **All data types** — strings, lists, sets, sorted sets, hashes, streams, JSON (RedisJSON), HyperLogLog, bitmaps, and geospatial
+- **All data types** — strings, lists, sets, sorted sets, hashes, streams, JSON (RedisJSON), HyperLogLog, bitmaps, geospatial, and protobuf
+- **Protobuf decoding** — binary string values that are raw protobuf or **s2-compressed** protobuf (`github.com/klauspost/compress/s2`) are detected and pretty-printed schema-less (field numbers, nested messages, strings) in the detail and preview panels
 - **Inline value editor** for editing string and JSON values
 - **Tree view** for hierarchical key navigation
 - **Favorites and recent keys** for quick access
