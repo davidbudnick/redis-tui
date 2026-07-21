@@ -3,6 +3,7 @@ package redis
 import (
 	"strings"
 
+	"github.com/davidbudnick/redis-tui/internal/decode"
 	"github.com/davidbudnick/redis-tui/internal/types"
 )
 
@@ -127,8 +128,8 @@ func markTruncated(value *types.RedisValue, total int64, fetched int) {
 	}
 }
 
-// previewString fills in a bounded string preview, including HLL and bitmap
-// subtype detection on the fetched prefix.
+// previewString fills in a bounded string preview, including HLL, protobuf, and
+// bitmap subtype detection on the fetched bytes.
 func (c *Client) previewString(key string, value *types.RedisValue) error {
 	total, err := c.cmdable().StrLen(c.ctx, key).Result()
 	if err != nil {
@@ -149,9 +150,25 @@ func (c *Client) previewString(key string, value *types.RedisValue) error {
 		return nil
 	}
 
+	// Prefer protobuf (incl. s2-compressed) over bitmap: binary probes that are
+	// really compressed menus must not be labeled as bitmaps in the list UI.
+	if decoded, ok := decode.TryBinary([]byte(val)); ok {
+		value.Type = types.KeyTypeProtobuf
+		value.DecodedValue = decoded.Text
+		value.DecodedFormat = decoded.Format
+		value.RawSize = decoded.RawSize
+		value.DecodedSize = decoded.DecodedSize
+		return nil
+	}
+
 	binary := isBinaryString(val)
 	if value.Truncated {
 		binary = isBinaryPrefix(val)
+		// Incomplete binary blob may still be compressed protobuf that only
+		// decodes with the full payload — leave type as string until GetValue.
+		if binary {
+			return nil
+		}
 	}
 	if binary {
 		value.Type = types.KeyTypeBitmap

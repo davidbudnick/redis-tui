@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/davidbudnick/redis-tui/internal/types"
+	"github.com/klauspost/compress/s2"
 )
 
 // ---------------------------------------------------------------------------
@@ -104,7 +105,8 @@ func TestGetValuePreview_Bitmap(t *testing.T) {
 
 func TestGetValuePreview_BitmapTruncated(t *testing.T) {
 	client, mr := setupTestClient(t)
-	// Binary value larger than the preview byte cap.
+	// Binary value larger than the preview byte cap. Incomplete binary must
+	// stay typed as string so large compressed protobuf is not mislabeled.
 	bin := make([]byte, previewMaxStringBytes+512)
 	for i := range bin {
 		bin[i] = 0xff
@@ -115,14 +117,11 @@ func TestGetValuePreview_BitmapTruncated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetValuePreview error: %v", err)
 	}
-	if v.Type != types.KeyTypeBitmap {
-		t.Errorf("Type = %q, want bitmap", v.Type)
+	if v.Type != types.KeyTypeString {
+		t.Errorf("Type = %q, want string for truncated non-protobuf binary", v.Type)
 	}
 	if !v.Truncated {
 		t.Error("expected Truncated = true")
-	}
-	if len(v.BitPositions) != maxBitPositions {
-		t.Errorf("BitPositions length = %d, want cap %d", len(v.BitPositions), maxBitPositions)
 	}
 }
 
@@ -600,4 +599,46 @@ func BenchmarkCompareStringFetch(b *testing.B) {
 			}
 		}
 	})
+}
+
+func TestGetValuePreview_ProtobufS2(t *testing.T) {
+	client, mr := setupTestClient(t)
+	var raw []byte
+	raw = append(raw, 0x0a, 0x04)
+	raw = append(raw, []byte("menu")...)
+	compressed := s2.Encode(nil, raw)
+	mr.Set("proto:s2", string(compressed))
+	v, err := client.GetValuePreview("proto:s2")
+	if err != nil {
+		t.Fatalf("GetValuePreview: %v", err)
+	}
+	if v.Type != types.KeyTypeProtobuf {
+		t.Fatalf("Type = %q, want protobuf", v.Type)
+	}
+	if v.DecodedFormat != "s2+protobuf" {
+		t.Errorf("DecodedFormat = %q", v.DecodedFormat)
+	}
+	if !strings.Contains(v.DecodedValue, "menu") {
+		t.Errorf("DecodedValue = %q", v.DecodedValue)
+	}
+}
+
+func TestGetValuePreview_TruncatedBinaryStaysString(t *testing.T) {
+	client, mr := setupTestClient(t)
+	// Binary blob larger than previewMaxStringBytes that is not valid protobuf.
+	bin := make([]byte, previewMaxStringBytes+1024)
+	for i := range bin {
+		bin[i] = 0xff
+	}
+	mr.Set("bigbin", string(bin))
+	v, err := client.GetValuePreview("bigbin")
+	if err != nil {
+		t.Fatalf("GetValuePreview: %v", err)
+	}
+	if v.Type != types.KeyTypeString {
+		t.Fatalf("Type = %q, want string (not bitmap) for truncated binary", v.Type)
+	}
+	if !v.Truncated {
+		t.Error("expected Truncated")
+	}
 }
