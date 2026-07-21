@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -769,6 +770,34 @@ func TestHandleKeyDetailScreen(t *testing.T) {
 			t.Error("expected cmd")
 		}
 	})
+	t.Run("y copy protobuf decoded", func(t *testing.T) {
+		m, _ := newModelWithKey(t, types.KeyTypeProtobuf)
+		m.CurrentValue = types.RedisValue{
+			Type:         types.KeyTypeProtobuf,
+			StringValue:  "raw-binary",
+			DecodedValue: "1: \"decoded\"\n",
+		}
+		_, cmd := m.handleKeyDetailScreen(keyMsg('y'))
+		if cmd == nil {
+			t.Error("expected cmd")
+		}
+	})
+	t.Run("a ignored for protobuf", func(t *testing.T) {
+		m, _ := newModelWithKey(t, types.KeyTypeProtobuf)
+		result, _ := m.handleKeyDetailScreen(keyMsg('a'))
+		model := result.(Model)
+		if model.Screen == types.ScreenAddToCollection {
+			t.Error("protobuf should not open add-to-collection")
+		}
+	})
+	t.Run("x ignored for protobuf", func(t *testing.T) {
+		m, _ := newModelWithKey(t, types.KeyTypeProtobuf)
+		result, _ := m.handleKeyDetailScreen(keyMsg('x'))
+		model := result.(Model)
+		if model.Screen == types.ScreenRemoveFromCollection {
+			t.Error("protobuf should not open remove-from-collection")
+		}
+	})
 	t.Run("J json path", func(t *testing.T) {
 		m, _ := newModelWithKey(t, types.KeyTypeString)
 		result, _ := m.handleKeyDetailScreen(keyMsg('J'))
@@ -781,44 +810,86 @@ func TestHandleKeyDetailScreen(t *testing.T) {
 		m, _ := newModelWithKey(t, types.KeyTypeList)
 		_, _ = m.handleKeyDetailScreen(keyMsg('J'))
 	})
-	t.Run("up scroll detail", func(t *testing.T) {
+	t.Run("up cursor detail", func(t *testing.T) {
 		m, _ := newModelWithKey(t, types.KeyTypeString)
-		m.DetailScroll = 3
+		m.Height = 40
+		m.Width = 120
+		m.CurrentValue = types.RedisValue{Type: types.KeyTypeString, StringValue: strings.Repeat("line\n", 20)}
+		m.DetailCursor = 3
 		result, _ := m.handleKeyDetailScreen(tea.KeyPressMsg{Code: tea.KeyUp})
 		model := result.(Model)
-		if model.DetailScroll != 2 {
-			t.Errorf("expected 2, got %d", model.DetailScroll)
+		if model.DetailCursor != 2 {
+			t.Errorf("expected cursor 2, got %d", model.DetailCursor)
 		}
 	})
 	t.Run("up scroll item", func(t *testing.T) {
 		m, _ := newModelWithKey(t, types.KeyTypeList)
 		m.SelectedItemIdx = 1
+		m.DetailCursor = 0
 		result, _ := m.handleKeyDetailScreen(keyMsg('k'))
 		model := result.(Model)
 		if model.SelectedItemIdx != 0 {
 			t.Errorf("expected 0, got %d", model.SelectedItemIdx)
 		}
 	})
-	t.Run("down scroll", func(t *testing.T) {
+	t.Run("down cursor", func(t *testing.T) {
 		m, _ := newModelWithKey(t, types.KeyTypeString)
-		_, _ = m.handleKeyDetailScreen(keyMsg('j'))
+		m.CurrentValue = types.RedisValue{Type: types.KeyTypeString, StringValue: "a\nb\nc\nd\ne"}
+		m.DetailCursor = 0
+		result, _ := m.handleKeyDetailScreen(keyMsg('j'))
+		if result.(Model).DetailCursor != 1 {
+			t.Errorf("expected cursor 1, got %d", result.(Model).DetailCursor)
+		}
+	})
+	t.Run("down cursor clamps at end", func(t *testing.T) {
+		m, _ := newModelWithKey(t, types.KeyTypeString)
+		m.CurrentValue = types.RedisValue{Type: types.KeyTypeString, StringValue: "only"}
+		m.DetailCursor = 0
+		result, _ := m.handleKeyDetailScreen(keyMsg('j'))
+		if result.(Model).DetailCursor != 0 {
+			t.Errorf("expected cursor stay 0, got %d", result.(Model).DetailCursor)
+		}
+	})
+	t.Run("pgdown clamps at end", func(t *testing.T) {
+		m, _ := newModelWithKey(t, types.KeyTypeString)
+		m.CurrentValue = types.RedisValue{Type: types.KeyTypeString, StringValue: "a\nb"}
+		m.DetailCursor = 0
+		result, _ := m.handleKeyDetailScreen(tea.KeyPressMsg{Code: tea.KeyPgDown})
+		if result.(Model).DetailCursor != 1 {
+			t.Errorf("expected cursor 1, got %d", result.(Model).DetailCursor)
+		}
+	})
+	t.Run("end empty content", func(t *testing.T) {
+		m, _ := newModelWithKey(t, types.KeyTypeString)
+		m.CurrentValue = types.RedisValue{Type: types.KeyTypeString, StringValue: ""}
+		result, _ := m.handleKeyDetailScreen(tea.KeyPressMsg{Code: tea.KeyEnd})
+		if result.(Model).DetailCursor != 0 {
+			t.Errorf("expected 0, got %d", result.(Model).DetailCursor)
+		}
 	})
 	t.Run("pgup detail", func(t *testing.T) {
 		m, _ := newModelWithKey(t, types.KeyTypeString)
-		m.DetailScroll = 20
-		_, _ = m.handleKeyDetailScreen(tea.KeyPressMsg{Code: tea.KeyPgUp})
+		m.Height = 40
+		m.Width = 120
+		m.CurrentValue = types.RedisValue{Type: types.KeyTypeString, StringValue: strings.Repeat("line\n", 40)}
+		m.DetailCursor = 20
+		result, _ := m.handleKeyDetailScreen(tea.KeyPressMsg{Code: tea.KeyPgUp})
+		if result.(Model).DetailCursor != 10 {
+			t.Errorf("expected cursor 10, got %d", result.(Model).DetailCursor)
+		}
 	})
 	t.Run("pgdown detail", func(t *testing.T) {
 		m, _ := newModelWithKey(t, types.KeyTypeString)
+		m.CurrentValue = types.RedisValue{Type: types.KeyTypeString, StringValue: strings.Repeat("line\n", 50)}
 		_, _ = m.handleKeyDetailScreen(tea.KeyPressMsg{Code: tea.KeyPgDown})
 	})
 	t.Run("home detail", func(t *testing.T) {
 		m, _ := newModelWithKey(t, types.KeyTypeString)
-		m.DetailScroll = 5
+		m.DetailCursor = 5
 		result, _ := m.handleKeyDetailScreen(tea.KeyPressMsg{Code: tea.KeyHome})
 		model := result.(Model)
-		if model.DetailScroll != 0 {
-			t.Errorf("expected 0, got %d", model.DetailScroll)
+		if model.DetailCursor != 0 {
+			t.Errorf("expected cursor 0, got %d", model.DetailCursor)
 		}
 	})
 	t.Run("g home", func(t *testing.T) {

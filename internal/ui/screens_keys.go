@@ -306,6 +306,7 @@ func (m Model) handleKeyDetailScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.CurrentKey != nil {
 			m.Loading = true
 			m.DetailScroll = 0
+			m.DetailCursor = 0
 			return m, tea.Batch(m.Cmds.LoadKeyValue(m.CurrentKey.Key), m.Cmds.GetMemoryUsage(m.CurrentKey.Key))
 		}
 	case "e":
@@ -329,13 +330,15 @@ func (m Model) handleKeyDetailScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.Screen = types.ScreenEditValue
 		}
 	case "a":
-		if m.CurrentKey != nil && m.CurrentKey.Type != types.KeyTypeString && m.CurrentKey.Type != types.KeyTypeJSON {
+		if m.CurrentKey != nil && m.CurrentKey.Type != types.KeyTypeString && m.CurrentKey.Type != types.KeyTypeJSON &&
+			m.CurrentKey.Type != types.KeyTypeProtobuf {
 			m.resetAddCollectionInputs()
 			m.Screen = types.ScreenAddToCollection
 		}
 	case "x":
 		if m.CurrentKey != nil && m.CurrentKey.Type != types.KeyTypeString && m.CurrentKey.Type != types.KeyTypeJSON &&
-			m.CurrentKey.Type != types.KeyTypeHyperLogLog && m.CurrentKey.Type != types.KeyTypeBitmap {
+			m.CurrentKey.Type != types.KeyTypeHyperLogLog && m.CurrentKey.Type != types.KeyTypeBitmap &&
+			m.CurrentKey.Type != types.KeyTypeProtobuf {
 			m.SelectedItemIdx = 0
 			m.Screen = types.ScreenRemoveFromCollection
 		}
@@ -382,7 +385,11 @@ func (m Model) handleKeyDetailScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	case "y":
 		if m.CurrentKey != nil {
-			return m, m.Cmds.CopyToClipboard(m.CurrentValue.StringValue)
+			clip := m.CurrentValue.StringValue
+			if m.CurrentKey.Type == types.KeyTypeProtobuf && m.CurrentValue.DecodedValue != "" {
+				clip = m.CurrentValue.DecodedValue
+			}
+			return m, m.Cmds.CopyToClipboard(clip)
 		}
 	case "J":
 		if m.CurrentKey != nil && m.CurrentKey.Type == types.KeyTypeString {
@@ -391,38 +398,54 @@ func (m Model) handleKeyDetailScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.Screen = types.ScreenJSONPath
 		}
 	case "up", "k":
-		if m.DetailScroll > 0 {
-			m.DetailScroll--
+		if m.DetailCursor > 0 {
+			m.DetailCursor--
+			m.syncDetailScroll()
 		} else if m.SelectedItemIdx > 0 {
 			m.SelectedItemIdx--
 		}
 	case "down", "j":
-		m.DetailScroll++
-		if m.DetailScroll > m.detailMaxScroll() {
-			m.DetailScroll = m.detailMaxScroll()
+		if m.DetailCursor+1 < m.detailContentLines() {
+			m.DetailCursor++
+			m.syncDetailScroll()
 		}
 	case "pgup", "ctrl+u":
-		m.DetailScroll -= 10
-		if m.DetailScroll < 0 {
-			m.DetailScroll = 0
+		m.DetailCursor -= 10
+		if m.DetailCursor < 0 {
+			m.DetailCursor = 0
 		}
+		m.syncDetailScroll()
 	case "pgdown", "ctrl+d":
-		m.DetailScroll += 10
-		if m.DetailScroll > m.detailMaxScroll() {
-			m.DetailScroll = m.detailMaxScroll()
+		m.DetailCursor += 10
+		if last := m.detailLastLine(); m.DetailCursor > last {
+			m.DetailCursor = last
 		}
+		m.syncDetailScroll()
 	case "home", "g":
-		m.DetailScroll = 0
+		m.DetailCursor = 0
+		m.syncDetailScroll()
 	case "end", "G":
-		m.DetailScroll = m.detailMaxScroll()
+		m.DetailCursor = m.detailLastLine()
+		m.syncDetailScroll()
 	case "esc", "backspace":
 		m.Screen = types.ScreenKeys
 		m.CurrentKey = nil
 		m.SelectedItemIdx = 0
 		m.DetailScroll = 0
+		m.DetailCursor = 0
 		m.WatchActive = false
 	}
 	return m, nil
+}
+
+// syncDetailScroll keeps DetailScroll aligned so DetailCursor stays visible.
+func (m *Model) syncDetailScroll() {
+	m.DetailCursor, m.DetailScroll = ensureDetailCursorVisible(
+		m.DetailCursor,
+		m.DetailScroll,
+		m.detailContentLines(),
+		detailMaxVisible(m.Height),
+	)
 }
 
 func (m Model) getCollectionLength() int {
@@ -439,7 +462,7 @@ func (m Model) getCollectionLength() int {
 		return len(m.CurrentValue.StreamValue)
 	case types.KeyTypeGeo:
 		return len(m.CurrentValue.GeoValue)
-	case types.KeyTypeHyperLogLog, types.KeyTypeJSON, types.KeyTypeBitmap:
+	case types.KeyTypeHyperLogLog, types.KeyTypeJSON, types.KeyTypeBitmap, types.KeyTypeProtobuf:
 		return 0
 	default:
 		return 0

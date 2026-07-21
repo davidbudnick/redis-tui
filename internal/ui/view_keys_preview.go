@@ -268,6 +268,39 @@ func (m Model) formatPreviewValue(maxWidth, maxLines int) string {
 	case types.KeyTypeHyperLogLog:
 		lines = append(lines, normalStyle.Render(fmt.Sprintf("Estimated cardinality: %d", m.PreviewValue.HLLCount)))
 
+	case types.KeyTypeProtobuf:
+		format := m.PreviewValue.DecodedFormat
+		if format == "" {
+			format = "protobuf"
+		}
+		lines = append(lines, dimStyle.Render(fmt.Sprintf("Format: %s", format)))
+		if m.PreviewValue.RawSize > 0 {
+			if m.PreviewValue.DecodedSize > 0 && m.PreviewValue.DecodedSize != m.PreviewValue.RawSize {
+				lines = append(lines, dimStyle.Render(fmt.Sprintf("Size: %s → %s",
+					formatBytes(int64(m.PreviewValue.RawSize)),
+					formatBytes(int64(m.PreviewValue.DecodedSize)))))
+			} else {
+				lines = append(lines, dimStyle.Render(fmt.Sprintf("Size: %s", formatBytes(int64(m.PreviewValue.RawSize)))))
+			}
+		}
+		lines = append(lines, "")
+		body := m.PreviewValue.DecodedValue
+		if body == "" {
+			lines = append(lines, dimStyle.Render("(unable to decode)"))
+			break
+		}
+		valueLines := strings.Split(body, "\n")
+		for i, line := range valueLines {
+			if i >= maxLines-3 {
+				lines = append(lines, dimStyle.Render(fmt.Sprintf("... (%d more lines)", len(valueLines)-i)))
+				break
+			}
+			if len(line) > maxWidth {
+				line = line[:maxWidth-3] + "..."
+			}
+			lines = append(lines, colorizeProtobufLine(line))
+		}
+
 	case types.KeyTypeBitmap:
 		lines = append(lines, dimStyle.Render(fmt.Sprintf("Bit count: %d", m.PreviewValue.BitCount)))
 		lines = append(lines, "")

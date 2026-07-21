@@ -339,6 +339,11 @@ func TestFormatPreviewValue(t *testing.T) {
 		{"bitmap with positions", types.RedisValue{Type: types.KeyTypeBitmap, BitCount: 3, BitPositions: []int64{1, 2, 3}}},
 		{"bitmap overflow positions", types.RedisValue{Type: types.KeyTypeBitmap, BitPositions: make([]int64, 30)}},
 		{"bitmap empty", types.RedisValue{Type: types.KeyTypeBitmap}},
+		{"protobuf", types.RedisValue{Type: types.KeyTypeProtobuf, DecodedFormat: "s2+protobuf", DecodedValue: "1: \"menu\"\n2: 42\n", RawSize: 100, DecodedSize: 400}},
+		{"protobuf empty decode", types.RedisValue{Type: types.KeyTypeProtobuf, RawSize: 10}},
+		{"protobuf long lines", types.RedisValue{Type: types.KeyTypeProtobuf, DecodedFormat: "protobuf", DecodedValue: strings.Repeat("1: \"x\"\n", 40), RawSize: 50, DecodedSize: 50}},
+		{"protobuf wide line", types.RedisValue{Type: types.KeyTypeProtobuf, DecodedFormat: "protobuf", DecodedValue: "1: \"" + strings.Repeat("w", 200) + "\"\n", RawSize: 20, DecodedSize: 20}},
+		{"protobuf same size preview", types.RedisValue{Type: types.KeyTypeProtobuf, DecodedFormat: "", DecodedValue: "1: 1\n", RawSize: 8, DecodedSize: 8}},
 		{"empty geo", types.RedisValue{Type: types.KeyTypeGeo}},
 		{"geo", types.RedisValue{Type: types.KeyTypeGeo, GeoValue: []types.GeoMember{{Name: "sf", Longitude: -122.4, Latitude: 37.7}}}},
 		{"geo long name", types.RedisValue{Type: types.KeyTypeGeo, GeoValue: []types.GeoMember{{Name: strings.Repeat("x", 100)}}}},
@@ -366,7 +371,7 @@ func TestViewKeyDetail(t *testing.T) {
 	types_ := []types.KeyType{
 		types.KeyTypeString, types.KeyTypeList, types.KeyTypeSet,
 		types.KeyTypeZSet, types.KeyTypeHash, types.KeyTypeStream,
-		types.KeyTypeJSON, types.KeyTypeHyperLogLog, types.KeyTypeBitmap, types.KeyTypeGeo,
+		types.KeyTypeJSON, types.KeyTypeHyperLogLog, types.KeyTypeBitmap, types.KeyTypeGeo, types.KeyTypeProtobuf,
 	}
 	for _, kt := range types_ {
 		t.Run(string(kt), func(t *testing.T) {
@@ -432,6 +437,86 @@ func TestViewKeyDetail(t *testing.T) {
 		m.CurrentValue = types.RedisValue{Type: types.KeyTypeBitmap, BitCount: 0}
 		assertNonEmpty(t, "empty bits", m.viewKeyDetail())
 	})
+	t.Run("bitmap capped positions", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.CurrentKey = &types.RedisKey{Key: "foo", Type: types.KeyTypeBitmap}
+		m.CurrentValue = types.RedisValue{Type: types.KeyTypeBitmap, BitCount: 10, BitPositions: []int64{0, 1, 2}}
+		out := m.viewKeyDetail()
+		if !strings.Contains(out, "more") {
+			t.Error("expected truncated bit positions message")
+		}
+	})
+	t.Run("protobuf decoded", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.CurrentKey = &types.RedisKey{Key: "menu", Type: types.KeyTypeProtobuf}
+		m.CurrentValue = types.RedisValue{
+			Type:          types.KeyTypeProtobuf,
+			DecodedFormat: "s2+protobuf",
+			DecodedValue:  "1: \"menu-id\"\n2: 7\n",
+			RawSize:       100,
+			DecodedSize:   400,
+		}
+		out := m.viewKeyDetail()
+		if !strings.Contains(out, "s2+protobuf") {
+			t.Error("expected format label in detail view")
+		}
+		if !strings.Contains(out, "menu-id") {
+			t.Error("expected decoded body in detail view")
+		}
+	})
+	t.Run("protobuf same size", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.CurrentKey = &types.RedisKey{Key: "menu", Type: types.KeyTypeProtobuf}
+		m.CurrentValue = types.RedisValue{
+			Type:          types.KeyTypeProtobuf,
+			DecodedFormat: "protobuf",
+			DecodedValue:  "1: 1\n",
+			RawSize:       20,
+			DecodedSize:   20,
+		}
+		assertNonEmpty(t, "proto same size", m.viewKeyDetail())
+	})
+	t.Run("protobuf empty body", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.CurrentKey = &types.RedisKey{Key: "menu", Type: types.KeyTypeProtobuf}
+		m.CurrentValue = types.RedisValue{Type: types.KeyTypeProtobuf}
+		out := m.viewKeyDetail()
+		if !strings.Contains(out, "unable to decode") {
+			t.Error("expected unable-to-decode message")
+		}
+	})
+	t.Run("protobuf selected line band", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.Width = 120
+		m.Height = 40
+		m.CurrentKey = &types.RedisKey{Key: "menu", Type: types.KeyTypeProtobuf}
+		m.CurrentValue = types.RedisValue{
+			Type:          types.KeyTypeProtobuf,
+			DecodedFormat: "protobuf",
+			DecodedValue:  strings.Repeat("1: \"item\"\n", 80),
+			RawSize:       10,
+			DecodedSize:   10,
+		}
+		m.DetailCursor = 40
+		m.DetailScroll = 30
+		out := m.viewKeyDetail()
+		if !strings.Contains(out, "item") {
+			t.Error("expected content with selection")
+		}
+		if !strings.Contains(out, "more lines") {
+			t.Error("expected scroll hints when cursor mid-body")
+		}
+		_ = out
+	})
+	t.Run("string selected line band", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.Width = 120
+		m.Height = 40
+		m.CurrentKey = &types.RedisKey{Key: "s", Type: types.KeyTypeString}
+		m.CurrentValue = types.RedisValue{Type: types.KeyTypeString, StringValue: "line1\nline2\nline3"}
+		m.DetailCursor = 1
+		assertNonEmpty(t, "string select", m.viewKeyDetail())
+	})
 	t.Run("long value scrolls", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.CurrentKey = &types.RedisKey{Key: "foo", Type: types.KeyTypeString}
@@ -463,9 +548,38 @@ func TestViewKeyDetail(t *testing.T) {
 
 func TestDetailContentLines(t *testing.T) {
 	m, _, _ := newTestModel(t)
+	m.Width = 120
+	m.Height = 40
 	m.CurrentValue = types.RedisValue{Type: types.KeyTypeString, StringValue: "a\nb\nc"}
 	if n := m.detailContentLines(); n < 1 {
 		t.Errorf("expected >= 1, got %d", n)
+	}
+	m.CurrentValue = types.RedisValue{
+		Type:          types.KeyTypeProtobuf,
+		DecodedFormat: "s2+protobuf",
+		DecodedValue:  strings.Repeat("1: \"x\"\n", 100),
+		RawSize:       50,
+		DecodedSize:   200,
+	}
+	if n := m.detailContentLines(); n < 10 {
+		t.Errorf("protobuf lines = %d, want many", n)
+	}
+	if max := m.detailMaxScroll(); max <= 0 {
+		t.Errorf("expected positive max scroll for long protobuf, got %d", max)
+	}
+	m.Height = 8
+	if n := m.detailMaxScroll(); n < 0 {
+		t.Errorf("tiny height scroll = %d", n)
+	}
+	// Force avail clamp path (detailMaxVisible floors at 5, so maxVisible-1 is always >=4
+	// for normal sizes; exercise via huge content anyway).
+	m.Height = detailChromeLines + 1
+	_ = m.detailMaxScroll()
+	// short value → zero scroll
+	m.CurrentValue = types.RedisValue{Type: types.KeyTypeString, StringValue: "hi"}
+	m.Height = 40
+	if n := m.detailMaxScroll(); n != 0 {
+		t.Errorf("short value max scroll = %d", n)
 	}
 }
 
@@ -473,7 +587,7 @@ func TestDetailValueString(t *testing.T) {
 	types_ := []types.KeyType{
 		types.KeyTypeString, types.KeyTypeList, types.KeyTypeSet,
 		types.KeyTypeZSet, types.KeyTypeHash, types.KeyTypeStream,
-		types.KeyTypeJSON, types.KeyTypeHyperLogLog, types.KeyTypeBitmap, types.KeyTypeGeo,
+		types.KeyTypeJSON, types.KeyTypeHyperLogLog, types.KeyTypeBitmap, types.KeyTypeGeo, types.KeyTypeProtobuf,
 	}
 	for _, kt := range types_ {
 		t.Run(string(kt), func(t *testing.T) {

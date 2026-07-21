@@ -1,13 +1,16 @@
 package redis
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/davidbudnick/redis-tui/internal/types"
+	"github.com/klauspost/compress/s2"
 	goredis "github.com/redis/go-redis/v9"
 )
 
@@ -599,6 +602,86 @@ func TestGetValue_Bitmap(t *testing.T) {
 	}
 	if len(v.BitPositions) != 3 {
 		t.Errorf("BitPositions length = %d, want 3", len(v.BitPositions))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// GetValue — Protobuf (raw + s2-compressed) branch
+// ---------------------------------------------------------------------------
+
+func TestGetValue_Protobuf(t *testing.T) {
+	client, mr := setupTestClient(t)
+
+	// field 1 string "menu-id", field 5 varint 7
+	var raw []byte
+	raw = append(raw, 0x0a, 0x07) // tag 1, len 7
+	raw = append(raw, []byte("menu-id")...)
+	raw = append(raw, 0x28, 0x07) // tag 5, varint 7
+
+	mr.Set("proto:raw", string(raw))
+	v, err := client.GetValue("proto:raw")
+	if err != nil {
+		t.Fatalf("GetValue error: %v", err)
+	}
+	if v.Type != types.KeyTypeProtobuf {
+		t.Fatalf("Type = %q, want %q", v.Type, types.KeyTypeProtobuf)
+	}
+	if v.DecodedFormat != "protobuf" {
+		t.Errorf("DecodedFormat = %q, want protobuf", v.DecodedFormat)
+	}
+	if !strings.Contains(v.DecodedValue, `1: "menu-id"`) {
+		t.Errorf("DecodedValue missing menu-id field:\n%s", v.DecodedValue)
+	}
+	if !strings.Contains(v.DecodedValue, "5: 7") {
+		t.Errorf("DecodedValue missing field 5:\n%s", v.DecodedValue)
+	}
+}
+
+func TestGetValue_Protobuf_S2(t *testing.T) {
+	client, mr := setupTestClient(t)
+
+	var raw []byte
+	raw = append(raw, 0x0a, 0x04)
+	raw = append(raw, []byte("abcd")...)
+	compressed := s2.Encode(nil, raw)
+
+	mr.Set("proto:s2", string(compressed))
+	v, err := client.GetValue("proto:s2")
+	if err != nil {
+		t.Fatalf("GetValue error: %v", err)
+	}
+	if v.Type != types.KeyTypeProtobuf {
+		t.Fatalf("Type = %q, want %q", v.Type, types.KeyTypeProtobuf)
+	}
+	if v.DecodedFormat != "s2+protobuf" {
+		t.Errorf("DecodedFormat = %q, want s2+protobuf", v.DecodedFormat)
+	}
+	if v.RawSize != len(compressed) {
+		t.Errorf("RawSize = %d, want %d", v.RawSize, len(compressed))
+	}
+	if v.DecodedSize != len(raw) {
+		t.Errorf("DecodedSize = %d, want %d", v.DecodedSize, len(raw))
+	}
+	if !strings.Contains(v.DecodedValue, `1: "abcd"`) {
+		t.Errorf("DecodedValue missing field:\n%s", v.DecodedValue)
+	}
+}
+
+func TestExtractBitPositions_Caps(t *testing.T) {
+	// 32 bytes all 0xff → 256 set bits; cap at 10.
+	raw := bytes.Repeat([]byte{0xff}, 32)
+	got := extractBitPositions(raw, 10)
+	if len(got) != 10 {
+		t.Fatalf("len = %d, want 10", len(got))
+	}
+	if got[0] != 0 || got[9] != 9 {
+		t.Errorf("positions = %v, want 0..9", got)
+	}
+	if extractBitPositions(raw, 0) != nil {
+		t.Error("max 0 should return nil")
+	}
+	if extractBitPositions(raw, -1) != nil {
+		t.Error("negative max should return nil")
 	}
 }
 

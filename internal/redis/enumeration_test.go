@@ -824,6 +824,26 @@ func TestScanKeys_DetectStringSubtypes_Bitmap(t *testing.T) {
 	}
 }
 
+func TestScanKeys_DetectStringSubtypes_Protobuf(t *testing.T) {
+	client, mr := setupTestClient(t)
+
+	var raw []byte
+	raw = append(raw, 0x0a, 0x04)
+	raw = append(raw, []byte("menu")...)
+	mr.Set("proto:detect", string(raw))
+
+	keys, _, err := client.ScanKeys("proto:detect", 0, 100)
+	if err != nil {
+		t.Fatalf("ScanKeys error: %v", err)
+	}
+	if len(keys) != 1 {
+		t.Fatalf("expected 1 key, got %d", len(keys))
+	}
+	if keys[0].Type != types.KeyTypeProtobuf {
+		t.Errorf("type = %q, want protobuf", keys[0].Type)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // detectStringSubtypes — Get error path on a single string key. We use the
 // fake server to return one key from SCAN, "string" type, then have GET fail.

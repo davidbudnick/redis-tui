@@ -41,6 +41,7 @@ func (m Model) handleKeyValueLoadedMsg(msg types.KeyValueLoadedMsg) (tea.Model, 
 	} else {
 		m.CurrentValue = msg.Value
 		m.DetailScroll = 0
+		m.DetailCursor = 0
 		// On-demand type resolution: fill in type if it was not fetched during scan,
 		// or update when GetValue detected a subtype (e.g. string→hyperloglog)
 		if m.CurrentKey != nil && msg.Value.Type != "" && m.CurrentKey.Type != msg.Value.Type {

@@ -7,7 +7,9 @@ require (
 	charm.land/bubbletea/v2 v2.0.8
 	charm.land/lipgloss/v2 v2.0.5
 	github.com/alicebob/miniredis/v2 v2.38.0
+	github.com/klauspost/compress v1.19.1
 	github.com/redis/go-redis/v9 v9.21.0
+	google.golang.org/protobuf v1.36.11
 )
 
 require (

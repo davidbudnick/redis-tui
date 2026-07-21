@@ -17,10 +17,8 @@ func (m Model) viewKeyDetail() string {
 		return "No key selected"
 	}
 
-	// Use ~60% of screen width for the detail view, capped reasonably
-	boxWidth := m.Width * 3 / 5
-	boxWidth = max(boxWidth, 50)
-	boxWidth = min(boxWidth, m.Width-6)
+	boxWidth := detailBoxWidth(m.Width)
+	contentWidth := detailContentWidth(boxWidth)
 
 	b.WriteString(lipgloss.PlaceHorizontal(boxWidth, lipgloss.Center, titleStyle.Render("Key Detail")))
 	b.WriteString("\n\n")
@@ -74,6 +72,78 @@ func (m Model) viewKeyDetail() string {
 		Padding(1, 2).
 		Width(boxWidth)
 
+	valueStr := m.detailValuePlainString()
+	// Wrap to the box content width so scroll line counts match what is painted.
+	valueLines := wrapPlainLines(strings.Split(valueStr, "\n"), contentWidth)
+	maxVisible := detailMaxVisible(m.Height)
+
+	// Derive a display scroll that keeps the cursor visible without mutating model state
+	// (View receives Model by value).
+	_, displayScroll := ensureDetailCursorVisible(m.DetailCursor, m.DetailScroll, len(valueLines), maxVisible)
+	visible, topHint, bottomHint, displayScroll := scrollValueLines(valueLines, displayScroll, maxVisible)
+
+	var display strings.Builder
+	if topHint != "" {
+		display.WriteString(topHint)
+		display.WriteByte('\n')
+	}
+	for i, line := range visible {
+		abs := displayScroll + i
+		if abs == m.DetailCursor {
+			// Phoenix-style full-width blue selection band (plain text, high contrast).
+			plain := padRight(truncateRunes(line, contentWidth), contentWidth)
+			display.WriteString(selectedStyle.Render(plain))
+		} else if m.CurrentValue.Type == types.KeyTypeProtobuf {
+			display.WriteString(colorizeProtobufLine(line))
+		} else {
+			display.WriteString(line)
+		}
+		if i < len(visible)-1 {
+			display.WriteByte('\n')
+		}
+	}
+	if bottomHint != "" {
+		display.WriteByte('\n')
+		display.WriteString(bottomHint)
+	}
+
+	b.WriteString(valueBox.Render(display.String()))
+	b.WriteString("\n\n")
+
+	helpText := "j/k:move  t:TTL  d:del  r:refresh  R:rename  c:copy"
+	switch m.CurrentKey.Type {
+	case types.KeyTypeString, types.KeyTypeJSON:
+		helpText += "  e:edit"
+	case types.KeyTypeHyperLogLog, types.KeyTypeBitmap:
+		helpText += "  a:add"
+	case types.KeyTypeProtobuf:
+		// read-only decoded view
+	default:
+		helpText += "  a:add  x:remove"
+	}
+	helpText += "  esc:back"
+	b.WriteString(lipgloss.PlaceHorizontal(boxWidth, lipgloss.Center, helpStyle.Render(helpText)))
+
+	return b.String()
+}
+
+func (m Model) detailContentLines() int {
+	lines := wrapPlainLines(strings.Split(m.detailValuePlainString(), "\n"), detailContentWidth(detailBoxWidth(m.Width)))
+	return len(lines)
+}
+
+// detailLastLine is the last selectable line index in the detail value body.
+func (m Model) detailLastLine() int {
+	return max(m.detailContentLines()-1, 0)
+}
+
+// detailValueString returns the detail body used by tests and line counting.
+func (m Model) detailValueString() string {
+	return m.detailValuePlainString()
+}
+
+// detailValuePlainString builds the unstyled value body for the detail pane.
+func (m Model) detailValuePlainString() string {
 	var vc strings.Builder
 	switch m.CurrentValue.Type {
 	case types.KeyTypeString:
@@ -108,7 +178,6 @@ func (m Model) viewKeyDetail() string {
 		if len(m.CurrentValue.HashValue) == 0 {
 			vc.WriteString("(empty hash)")
 		} else {
-			// Sort hash keys for consistent display
 			hashKeys := make([]string, 0, len(m.CurrentValue.HashValue))
 			for k := range m.CurrentValue.HashValue {
 				hashKeys = append(hashKeys, k)
@@ -117,7 +186,6 @@ func (m Model) viewKeyDetail() string {
 			for _, k := range hashKeys {
 				v := m.CurrentValue.HashValue[k]
 				formattedValue := formatPossibleJSON(v)
-				// Check if value is multi-line JSON
 				if strings.Contains(formattedValue, "\n") {
 					fmt.Fprintf(&vc, "◆ %s:\n%s\n", k, formattedValue)
 				} else {
@@ -130,7 +198,6 @@ func (m Model) viewKeyDetail() string {
 			vc.WriteString("(empty stream)")
 		} else {
 			for _, entry := range m.CurrentValue.StreamValue {
-				// Try to format stream fields as JSON
 				jsonBytes, err := json.MarshalIndent(entry.Fields, "", "  ")
 				if err == nil {
 					fmt.Fprintf(&vc, "%s:\n%s\n", entry.ID, string(jsonBytes))
@@ -147,12 +214,17 @@ func (m Model) viewKeyDetail() string {
 		vc.WriteString(formatPossibleJSON(m.CurrentValue.JSONValue))
 	case types.KeyTypeHyperLogLog:
 		fmt.Fprintf(&vc, "Estimated cardinality: %d", m.CurrentValue.HLLCount)
+	case types.KeyTypeProtobuf:
+		vc.WriteString(formatProtobufValue(m.CurrentValue))
 	case types.KeyTypeBitmap:
 		fmt.Fprintf(&vc, "Bit count: %d\n\n", m.CurrentValue.BitCount)
 		if len(m.CurrentValue.BitPositions) > 0 {
 			vc.WriteString("Set positions:\n")
 			for _, pos := range m.CurrentValue.BitPositions {
 				fmt.Fprintf(&vc, "  bit %d = 1\n", pos)
+			}
+			if m.CurrentValue.BitCount > int64(len(m.CurrentValue.BitPositions)) {
+				fmt.Fprintf(&vc, "  … and %d more\n", m.CurrentValue.BitCount-int64(len(m.CurrentValue.BitPositions)))
 			}
 		} else {
 			vc.WriteString("(all bits are 0)")
@@ -166,115 +238,42 @@ func (m Model) viewKeyDetail() string {
 			}
 		}
 	}
-
-	// Apply scrolling for long values
-	valueStr := strings.TrimSpace(vc.String())
-	valueLines := strings.Split(valueStr, "\n")
-	// Reserve lines for header (6) + border/padding (4) + help (2)
-	maxVisible := m.Height - 12
-	if maxVisible < 5 {
-		maxVisible = 5
-	}
-
-	if len(valueLines) > maxVisible {
-		if m.DetailScroll > len(valueLines)-maxVisible {
-			m.DetailScroll = len(valueLines) - maxVisible
-		}
-		if m.DetailScroll < 0 {
-			m.DetailScroll = 0
-		}
-		end := m.DetailScroll + maxVisible
-		visible := valueLines[m.DetailScroll:end]
-		var scrollInfo string
-		if m.DetailScroll > 0 {
-			scrollInfo += dimStyle.Render(fmt.Sprintf("↑ %d more lines above", m.DetailScroll))
-			scrollInfo += "\n"
-		}
-		scrollInfo += strings.Join(visible, "\n")
-		remaining := len(valueLines) - end
-		if remaining > 0 {
-			scrollInfo += "\n"
-			scrollInfo += dimStyle.Render(fmt.Sprintf("↓ %d more lines below", remaining))
-		}
-		valueStr = scrollInfo
-	}
-
-	b.WriteString(valueBox.Render(valueStr))
-	b.WriteString("\n\n")
-
-	helpText := "t:TTL  d:del  r:refresh  R:rename  c:copy"
-	switch m.CurrentKey.Type {
-	case types.KeyTypeString, types.KeyTypeJSON:
-		helpText += "  e:edit"
-	case types.KeyTypeHyperLogLog, types.KeyTypeBitmap:
-		helpText += "  a:add"
-	default:
-		helpText += "  a:add  x:remove"
-	}
-	helpText += "  esc:back"
-	b.WriteString(lipgloss.PlaceHorizontal(boxWidth, lipgloss.Center, helpStyle.Render(helpText)))
-
-
-	return b.String()
-}
-
-func (m Model) detailContentLines() int {
-	return strings.Count(m.detailValueString(), "\n") + 1
-}
-
-func (m Model) detailValueString() string {
-	var vc strings.Builder
-	switch m.CurrentValue.Type {
-	case types.KeyTypeString:
-		vc.WriteString(formatPossibleJSON(m.CurrentValue.StringValue))
-	case types.KeyTypeList:
-		for i, v := range m.CurrentValue.ListValue {
-			fmt.Fprintf(&vc, "%d. %s\n", i, v)
-		}
-	case types.KeyTypeSet:
-		for _, v := range m.CurrentValue.SetValue {
-			fmt.Fprintf(&vc, "• %s\n", v)
-		}
-	case types.KeyTypeZSet:
-		for _, v := range m.CurrentValue.ZSetValue {
-			fmt.Fprintf(&vc, "%.2f: %s\n", v.Score, v.Member)
-		}
-	case types.KeyTypeHash:
-		for k, v := range m.CurrentValue.HashValue {
-			fmt.Fprintf(&vc, "%s: %s\n", k, v)
-		}
-	case types.KeyTypeStream:
-		for _, e := range m.CurrentValue.StreamValue {
-			fmt.Fprintf(&vc, "%s\n", e.ID)
-		}
-	case types.KeyTypeJSON:
-		vc.WriteString(formatPossibleJSON(m.CurrentValue.JSONValue))
-	case types.KeyTypeHyperLogLog:
-		fmt.Fprintf(&vc, "Estimated cardinality: %d", m.CurrentValue.HLLCount)
-	case types.KeyTypeBitmap:
-		fmt.Fprintf(&vc, "Bit count: %d\n", m.CurrentValue.BitCount)
-		for _, pos := range m.CurrentValue.BitPositions {
-			fmt.Fprintf(&vc, "  bit %d = 1\n", pos)
-		}
-	case types.KeyTypeGeo:
-		for _, g := range m.CurrentValue.GeoValue {
-			fmt.Fprintf(&vc, "%s  (%.6f, %.6f)\n", g.Name, g.Longitude, g.Latitude)
-		}
-	}
 	return strings.TrimSpace(vc.String())
 }
 
-func (m Model) detailMaxScroll() int {
-	maxVisible := m.Height - 12
-	if maxVisible < 5 {
-		maxVisible = 5
+// formatProtobufValue renders decoded protobuf metadata and text body.
+func formatProtobufValue(v types.RedisValue) string {
+	var b strings.Builder
+	format := v.DecodedFormat
+	if format == "" {
+		format = "protobuf"
 	}
+	fmt.Fprintf(&b, "Format: %s\n", format)
+	if v.RawSize > 0 {
+		if v.DecodedSize > 0 && v.DecodedSize != v.RawSize {
+			fmt.Fprintf(&b, "Size: %s compressed → %s decoded\n", formatBytes(int64(v.RawSize)), formatBytes(int64(v.DecodedSize)))
+		} else {
+			fmt.Fprintf(&b, "Size: %s\n", formatBytes(int64(v.RawSize)))
+		}
+	}
+	b.WriteString("\n")
+	if v.DecodedValue != "" {
+		b.WriteString(v.DecodedValue)
+	} else {
+		b.WriteString("(unable to decode protobuf payload)")
+	}
+	return b.String()
+}
+
+func (m Model) detailMaxScroll() int {
+	maxVisible := detailMaxVisible(m.Height)
 	totalLines := m.detailContentLines()
-	maxScroll := totalLines - maxVisible
-	if maxScroll < 0 {
+	if totalLines <= maxVisible {
 		return 0
 	}
-	return maxScroll
+	// Match scrollValueLines at scroll=0: one slot reserved for the bottom hint.
+	// detailMaxVisible is always >= 5, so maxVisible-1 is always usable content.
+	return totalLines - (maxVisible - 1)
 }
 
 func (m Model) viewAddKey() string {

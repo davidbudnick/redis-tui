@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/davidbudnick/redis-tui/internal/decode"
 	"github.com/davidbudnick/redis-tui/internal/types"
 	"github.com/redis/go-redis/v9"
 )
@@ -315,6 +316,18 @@ func extractValue(keyType string, r valueFetchCmds) types.RedisValue {
 	case "string":
 		if r.strCmd != nil {
 			value.StringValue, _ = r.strCmd.Result()
+			if len(value.StringValue) >= 4 && value.StringValue[:4] == "HYLL" {
+				value.Type = types.KeyTypeHyperLogLog
+			} else if decoded, ok := decode.TryBinary([]byte(value.StringValue)); ok {
+				value.Type = types.KeyTypeProtobuf
+				value.DecodedValue = decoded.Text
+				value.DecodedFormat = decoded.Format
+				value.RawSize = decoded.RawSize
+				value.DecodedSize = decoded.DecodedSize
+			} else if isBinaryString(value.StringValue) {
+				value.Type = types.KeyTypeBitmap
+				value.BitPositions = extractBitPositions([]byte(value.StringValue), maxBitPositions)
+			}
 		}
 	case "list":
 		if r.listCmd != nil {

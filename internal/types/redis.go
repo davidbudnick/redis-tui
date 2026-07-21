@@ -6,16 +6,17 @@ import "time"
 type KeyType string
 
 const (
-	KeyTypeString KeyType = "string"
-	KeyTypeList   KeyType = "list"
-	KeyTypeSet    KeyType = "set"
-	KeyTypeZSet   KeyType = "zset"
-	KeyTypeHash   KeyType = "hash"
-	KeyTypeStream KeyType = "stream"
+	KeyTypeString      KeyType = "string"
+	KeyTypeList        KeyType = "list"
+	KeyTypeSet         KeyType = "set"
+	KeyTypeZSet        KeyType = "zset"
+	KeyTypeHash        KeyType = "hash"
+	KeyTypeStream      KeyType = "stream"
 	KeyTypeJSON        KeyType = "ReJSON-RL"
 	KeyTypeHyperLogLog KeyType = "hyperloglog"
 	KeyTypeBitmap      KeyType = "bitmap"
 	KeyTypeGeo         KeyType = "geo"
+	KeyTypeProtobuf    KeyType = "protobuf"
 )
 
 // RedisKey represents a key with metadata
@@ -29,18 +30,25 @@ type RedisKey struct {
 
 // RedisValue holds the value for any Redis type
 type RedisValue struct {
-	Type        KeyType
-	StringValue string
-	ListValue   []string
-	SetValue    []string
-	ZSetValue   []ZSetMember
-	HashValue   map[string]string
-	StreamValue []StreamEntry
-	JSONValue   string
+	Type         KeyType
+	StringValue  string
+	ListValue    []string
+	SetValue     []string
+	ZSetValue    []ZSetMember
+	HashValue    map[string]string
+	StreamValue  []StreamEntry
+	JSONValue    string
 	HLLCount     int64       // cardinality for HyperLogLog (from PFCOUNT)
 	GeoValue     []GeoMember // members with coordinates for Geo
 	BitCount     int64       // bit count for Bitmap (from BITCOUNT)
 	BitPositions []int64     // set bit positions for Bitmap display
+	// DecodedValue is a human-readable rendering for binary formats (e.g. protobuf).
+	DecodedValue string
+	// DecodedFormat labels how DecodedValue was produced (e.g. "s2+protobuf").
+	DecodedFormat string
+	// RawSize / DecodedSize track original vs decompressed payload sizes.
+	RawSize     int
+	DecodedSize int
 }
 
 // GeoMember represents a geospatial member with coordinates

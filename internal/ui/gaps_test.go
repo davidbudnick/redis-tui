@@ -325,10 +325,10 @@ func TestHandleKeyDetailScreen_ScrollClamp(t *testing.T) {
 func TestHandleKeyDetailScreen_PgUpClamp(t *testing.T) {
 	m, _, _ := newTestModel(t)
 	m.CurrentKey = &types.RedisKey{Key: "foo", Type: types.KeyTypeString}
-	m.DetailScroll = 3 // pgup -10 → -7 → clamp to 0
+	m.DetailCursor = 3 // pgup -10 → -7 → clamp to 0
 	result, _ := m.handleKeyDetailScreen(tea.KeyPressMsg{Code: tea.KeyPgUp})
-	if result.(Model).DetailScroll != 0 {
-		t.Errorf("expected 0, got %d", result.(Model).DetailScroll)
+	if result.(Model).DetailCursor != 0 {
+		t.Errorf("expected 0, got %d", result.(Model).DetailCursor)
 	}
 }
 
