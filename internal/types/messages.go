@@ -158,6 +158,11 @@ type SearchDebounceMsg struct {
 	Seq int
 }
 
+type PreviewDebounceMsg struct {
+	Seq int
+	Key string
+}
+
 type TTLRefreshMsg struct {
 	Keys []RedisKey
 	Err  error

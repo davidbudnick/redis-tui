@@ -38,6 +38,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case types.PreviewDebounceMsg:
+		if msg.Seq == m.PreviewSeq &&
+			len(m.Keys) > 0 &&
+			m.SelectedKeyIdx < len(m.Keys) &&
+			m.Keys[m.SelectedKeyIdx].Key == msg.Key {
+			return m, m.Cmds.LoadKeyPreview(msg.Key)
+		}
+		return m, nil
+
 	case types.TickMsg:
 		return m.handleTickMsg()
 
