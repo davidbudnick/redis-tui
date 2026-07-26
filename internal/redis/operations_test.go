@@ -761,13 +761,15 @@ func TestBatchSetTTL_Persist(t *testing.T) {
 
 func TestGetValue_HyperLogLog_PFCountSuccess(t *testing.T) {
 	srv := newFakeRedisServer(t)
+	hll := "HYLL" + string(make([]byte, 12))
 	srv.setHandler(func(argv []string) string {
 		switch argv[0] {
 		case "TYPE":
 			return "+string\r\n"
-		case "GET":
-			// Return HYLL-prefixed bulk string so HLL detection triggers.
-			return respBulkString("HYLL" + string(make([]byte, 12)))
+		case "STRLEN":
+			return fmt.Sprintf(":%d\r\n", len(hll))
+		case "GETRANGE":
+			return respBulkString(hll)
 		case "PFCOUNT":
 			return ":7\r\n"
 		}
@@ -818,17 +820,19 @@ func TestGetValue_TypeError(t *testing.T) {
 }
 
 // gvFakeClient connects a real Client to a fakeRedisServer that responds to
-// TYPE with the requested key type and to the matching value command with an
-// error. This drives the error-return branches inside GetValue.
-func gvFakeClient(t *testing.T, keyType string, valueCmd string) *Client {
+// TYPE with the requested key type, optional prefetch successes, then fails valueCmd.
+func gvFakeClient(t *testing.T, keyType string, valueCmd string, prefetch map[string]string) *Client {
 	t.Helper()
 	srv := newFakeRedisServer(t)
 	srv.setHandler(func(argv []string) string {
-		switch argv[0] {
-		case "TYPE":
-			return "+" + keyType + "\r\n"
-		case valueCmd:
+		if argv[0] == valueCmd {
 			return "-ERR injected\r\n"
+		}
+		if argv[0] == "TYPE" {
+			return "+" + keyType + "\r\n"
+		}
+		if resp, ok := prefetch[argv[0]]; ok {
+			return resp
 		}
 		return ""
 	})
@@ -842,42 +846,84 @@ func gvFakeClient(t *testing.T, keyType string, valueCmd string) *Client {
 }
 
 func TestGetValue_StringError(t *testing.T) {
-	c := gvFakeClient(t, "string", "GET")
+	c := gvFakeClient(t, "string", "STRLEN", nil)
 	if _, err := c.GetValue("k"); err == nil {
-		t.Error("expected error from GetValue on string GET error")
+		t.Error("expected error from GetValue on string STRLEN error")
+	}
+}
+
+func TestGetValue_StringGetRangeError(t *testing.T) {
+	c := gvFakeClient(t, "string", "GETRANGE", map[string]string{"STRLEN": ":5\r\n"})
+	if _, err := c.GetValue("k"); err == nil {
+		t.Error("expected error from GetValue on string GETRANGE error")
 	}
 }
 
 func TestGetValue_ListError(t *testing.T) {
-	c := gvFakeClient(t, "list", "LRANGE")
+	c := gvFakeClient(t, "list", "LLEN", nil)
+	if _, err := c.GetValue("k"); err == nil {
+		t.Error("expected error from GetValue on list LLEN error")
+	}
+}
+
+func TestGetValue_ListLRangeError(t *testing.T) {
+	c := gvFakeClient(t, "list", "LRANGE", map[string]string{"LLEN": ":5\r\n"})
 	if _, err := c.GetValue("k"); err == nil {
 		t.Error("expected error from GetValue on list LRANGE error")
 	}
 }
 
 func TestGetValue_SetError(t *testing.T) {
-	c := gvFakeClient(t, "set", "SMEMBERS")
+	c := gvFakeClient(t, "set", "SCARD", nil)
 	if _, err := c.GetValue("k"); err == nil {
-		t.Error("expected error from GetValue on set SMEMBERS error")
+		t.Error("expected error from GetValue on set SCARD error")
+	}
+}
+
+func TestGetValue_SetScanError(t *testing.T) {
+	c := gvFakeClient(t, "set", "SSCAN", map[string]string{"SCARD": ":5\r\n"})
+	if _, err := c.GetValue("k"); err == nil {
+		t.Error("expected error from GetValue on set SSCAN error")
 	}
 }
 
 func TestGetValue_ZSetError(t *testing.T) {
-	c := gvFakeClient(t, "zset", "ZRANGE")
+	c := gvFakeClient(t, "zset", "ZCARD", nil)
+	if _, err := c.GetValue("k"); err == nil {
+		t.Error("expected error from GetValue on zset ZCARD error")
+	}
+}
+
+func TestGetValue_ZSetRangeError(t *testing.T) {
+	c := gvFakeClient(t, "zset", "ZRANGE", map[string]string{"ZCARD": ":5\r\n"})
 	if _, err := c.GetValue("k"); err == nil {
 		t.Error("expected error from GetValue on zset ZRANGE error")
 	}
 }
 
 func TestGetValue_HashError(t *testing.T) {
-	c := gvFakeClient(t, "hash", "HGETALL")
+	c := gvFakeClient(t, "hash", "HLEN", nil)
 	if _, err := c.GetValue("k"); err == nil {
-		t.Error("expected error from GetValue on hash HGETALL error")
+		t.Error("expected error from GetValue on hash HLEN error")
+	}
+}
+
+func TestGetValue_HashScanError(t *testing.T) {
+	c := gvFakeClient(t, "hash", "HSCAN", map[string]string{"HLEN": ":5\r\n"})
+	if _, err := c.GetValue("k"); err == nil {
+		t.Error("expected error from GetValue on hash HSCAN error")
 	}
 }
 
 func TestGetValue_StreamError(t *testing.T) {
-	c := gvFakeClient(t, "stream", "XRANGE")
+	c := gvFakeClient(t, "stream", "XLEN", nil)
+	if _, err := c.GetValue("k"); err == nil {
+		t.Error("expected error from GetValue on stream XLEN error")
+	}
+}
+
+func TestGetValue_StreamRangeError(t *testing.T) {
+	c := gvFakeClient(t, "stream", "XRANGE", map[string]string{"XLEN": ":5\r\n"})
 	if _, err := c.GetValue("k"); err == nil {
 		t.Error("expected error from GetValue on stream XRANGE error")
 	}
@@ -1180,6 +1226,157 @@ func TestGetValue_Protobuf_S2(t *testing.T) {
 	}
 }
 
+func TestGetValue_TruncatesLargeValues(t *testing.T) {
+	t.Run("string", func(t *testing.T) {
+		client, mr := setupTestClient(t)
+		total := detailMaxStringBytes + 2048
+		mr.Set("bigstr", strings.Repeat("a", total))
+
+		v, err := client.GetValue("bigstr")
+		if err != nil {
+			t.Fatalf("GetValue error: %v", err)
+		}
+		if len(v.StringValue) != detailMaxStringBytes {
+			t.Errorf("StringValue length = %d, want %d", len(v.StringValue), detailMaxStringBytes)
+		}
+		if !v.Truncated {
+			t.Error("expected Truncated = true")
+		}
+		if v.TotalCount != int64(total) {
+			t.Errorf("TotalCount = %d, want %d", v.TotalCount, total)
+		}
+	})
+
+	t.Run("string small not truncated", func(t *testing.T) {
+		client, mr := setupTestClient(t)
+		mr.Set("small", "hello")
+		v, err := client.GetValue("small")
+		if err != nil {
+			t.Fatalf("GetValue error: %v", err)
+		}
+		if v.Truncated {
+			t.Error("expected Truncated = false")
+		}
+		if v.StringValue != "hello" {
+			t.Errorf("StringValue = %q, want hello", v.StringValue)
+		}
+	})
+
+	t.Run("list", func(t *testing.T) {
+		client, mr := setupTestClient(t)
+		total := detailMaxItems + 50
+		for i := 0; i < total; i++ {
+			mr.RPush("biglist", "item")
+		}
+		v, err := client.GetValue("biglist")
+		if err != nil {
+			t.Fatalf("GetValue error: %v", err)
+		}
+		if len(v.ListValue) != detailMaxItems {
+			t.Errorf("ListValue length = %d, want %d", len(v.ListValue), detailMaxItems)
+		}
+		if !v.Truncated || v.TotalCount != int64(total) {
+			t.Errorf("Truncated/TotalCount = %v/%d, want true/%d", v.Truncated, v.TotalCount, total)
+		}
+	})
+
+	t.Run("set", func(t *testing.T) {
+		client, mr := setupTestClient(t)
+		total := detailMaxItems + 50
+		for i := 0; i < total; i++ {
+			mr.SAdd("bigset", fmt.Sprintf("m:%06d", i))
+		}
+		v, err := client.GetValue("bigset")
+		if err != nil {
+			t.Fatalf("GetValue error: %v", err)
+		}
+		if len(v.SetValue) != detailMaxItems {
+			t.Errorf("SetValue length = %d, want %d", len(v.SetValue), detailMaxItems)
+		}
+		if !v.Truncated || v.TotalCount != int64(total) {
+			t.Errorf("Truncated/TotalCount = %v/%d, want true/%d", v.Truncated, v.TotalCount, total)
+		}
+	})
+
+	t.Run("zset", func(t *testing.T) {
+		client, mr := setupTestClient(t)
+		total := detailMaxItems + 50
+		for i := 0; i < total; i++ {
+			mr.ZAdd("bigz", float64(i), fmt.Sprintf("m:%06d", i))
+		}
+		v, err := client.GetValue("bigz")
+		if err != nil {
+			t.Fatalf("GetValue error: %v", err)
+		}
+		if len(v.ZSetValue) != detailMaxItems {
+			t.Errorf("ZSetValue length = %d, want %d", len(v.ZSetValue), detailMaxItems)
+		}
+		if !v.Truncated || v.TotalCount != int64(total) {
+			t.Errorf("Truncated/TotalCount = %v/%d, want true/%d", v.Truncated, v.TotalCount, total)
+		}
+	})
+
+	t.Run("hash", func(t *testing.T) {
+		client, mr := setupTestClient(t)
+		total := detailMaxItems + 50
+		for i := 0; i < total; i++ {
+			mr.HSet("bighash", fmt.Sprintf("f:%06d", i), "v")
+		}
+		v, err := client.GetValue("bighash")
+		if err != nil {
+			t.Fatalf("GetValue error: %v", err)
+		}
+		if len(v.HashValue) != detailMaxItems {
+			t.Errorf("HashValue length = %d, want %d", len(v.HashValue), detailMaxItems)
+		}
+		if !v.Truncated || v.TotalCount != int64(total) {
+			t.Errorf("Truncated/TotalCount = %v/%d, want true/%d", v.Truncated, v.TotalCount, total)
+		}
+	})
+
+	t.Run("stream", func(t *testing.T) {
+		client, _ := setupTestClient(t)
+		total := detailMaxItems + 50
+		for i := 0; i < total; i++ {
+			if _, err := client.XAdd("bigstream", map[string]any{"k": "v"}); err != nil {
+				t.Fatalf("XAdd error: %v", err)
+			}
+		}
+		v, err := client.GetValue("bigstream")
+		if err != nil {
+			t.Fatalf("GetValue error: %v", err)
+		}
+		if len(v.StreamValue) != detailMaxItems {
+			t.Errorf("StreamValue length = %d, want %d", len(v.StreamValue), detailMaxItems)
+		}
+		if !v.Truncated || v.TotalCount != int64(total) {
+			t.Errorf("Truncated/TotalCount = %v/%d, want true/%d", v.Truncated, v.TotalCount, total)
+		}
+	})
+
+	t.Run("truncated bitmap still classified", func(t *testing.T) {
+		client, mr := setupTestClient(t)
+		bin := make([]byte, detailMaxStringBytes+512)
+		for i := range bin {
+			bin[i] = 0xff
+		}
+		mr.Set("bigbm", string(bin))
+
+		v, err := client.GetValue("bigbm")
+		if err != nil {
+			t.Fatalf("GetValue error: %v", err)
+		}
+		if v.Type != types.KeyTypeBitmap {
+			t.Errorf("Type = %q, want bitmap", v.Type)
+		}
+		if !v.Truncated {
+			t.Error("expected Truncated = true")
+		}
+		if len(v.BitPositions) != maxBitPositions {
+			t.Errorf("BitPositions length = %d, want %d", len(v.BitPositions), maxBitPositions)
+		}
+	})
+}
 
 func TestExtractBitPositions_Caps(t *testing.T) {
 	// 32 bytes all 0xff → 256 set bits; cap at 10.

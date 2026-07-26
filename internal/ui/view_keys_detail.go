@@ -251,7 +251,15 @@ func buildDetailValueContent(value types.RedisValue) string {
 			}
 		}
 	}
-	return strings.TrimSpace(vc.String())
+	body := strings.TrimSpace(vc.String())
+	if value.Truncated {
+		marker := fmt.Sprintf("(truncated — %d total)", value.TotalCount)
+		if body == "" {
+			return marker
+		}
+		return body + "\n" + marker
+	}
+	return body
 }
 
 // formatProtobufValue renders decoded protobuf metadata and text body.

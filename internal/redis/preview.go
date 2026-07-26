@@ -8,12 +8,10 @@ import (
 )
 
 const (
-	// previewMaxItems caps how many collection entries are fetched for the
-	// keys-list preview panel, which only ever displays a screenful.
-	previewMaxItems = 100
-	// previewMaxStringBytes caps how many bytes of a string value are fetched
-	// for the preview panel.
+	previewMaxItems       = 100
 	previewMaxStringBytes = 64 * 1024
+	detailMaxItems        = 1000
+	detailMaxStringBytes  = 1024 * 1024
 )
 
 // GetValuePreview retrieves a bounded preview of a key's value. Unlike
@@ -23,6 +21,21 @@ const (
 // value was cut off, Truncated is set and TotalCount holds the full
 // length/cardinality.
 func (c *Client) GetValuePreview(key string) (types.RedisValue, error) {
+	return c.getValueBounded(key, previewMaxItems, previewMaxStringBytes, true)
+}
+
+// markTruncated sets the Truncated/TotalCount fields when fewer entries were
+// fetched than exist.
+func markTruncated(value *types.RedisValue, total int64, fetched int) {
+	if total > int64(fetched) {
+		value.Truncated = true
+		value.TotalCount = total
+	}
+}
+
+// getValueBounded loads a key with collection/string caps. When deferTruncatedBinary
+// is true, truncated non-protobuf binary stays typed as string (preview path).
+func (c *Client) getValueBounded(key string, maxItems int, maxStringBytes int64, deferTruncatedBinary bool) (types.RedisValue, error) {
 	keyType, err := c.cmdable().Type(c.ctx, key).Result()
 	if err != nil {
 		return types.RedisValue{}, err
@@ -33,80 +46,34 @@ func (c *Client) GetValuePreview(key string) (types.RedisValue, error) {
 
 	switch keyType {
 	case "string":
-		if err := c.previewString(key, &value); err != nil {
+		if err := c.fetchString(key, &value, maxStringBytes, deferTruncatedBinary); err != nil {
 			return value, err
 		}
 
 	case "list":
-		total, err := c.cmdable().LLen(c.ctx, key).Result()
-		if err != nil {
+		if err := c.fetchList(key, &value, maxItems); err != nil {
 			return value, err
 		}
-		vals, err := c.cmdable().LRange(c.ctx, key, 0, previewMaxItems-1).Result()
-		if err != nil {
-			return value, err
-		}
-		value.ListValue = vals
-		markTruncated(&value, total, len(vals))
 
 	case "set":
-		total, err := c.cmdable().SCard(c.ctx, key).Result()
-		if err != nil {
+		if err := c.fetchSet(key, &value, maxItems); err != nil {
 			return value, err
 		}
-		members, err := c.scanSetPreview(key)
-		if err != nil {
-			return value, err
-		}
-		value.SetValue = members
-		markTruncated(&value, total, len(members))
 
 	case "zset":
-		total, err := c.cmdable().ZCard(c.ctx, key).Result()
-		if err != nil {
+		if err := c.fetchZSet(key, &value, maxItems); err != nil {
 			return value, err
 		}
-		vals, err := c.cmdable().ZRangeWithScores(c.ctx, key, 0, previewMaxItems-1).Result()
-		if err != nil {
-			return value, err
-		}
-		for _, z := range vals {
-			value.ZSetValue = append(value.ZSetValue, types.ZSetMember{
-				Member: z.Member.(string),
-				Score:  z.Score,
-			})
-		}
-		markTruncated(&value, total, len(value.ZSetValue))
-		c.previewGeoDetect(key, &value)
 
 	case "hash":
-		total, err := c.cmdable().HLen(c.ctx, key).Result()
-		if err != nil {
+		if err := c.fetchHash(key, &value, maxItems); err != nil {
 			return value, err
 		}
-		fields, err := c.scanHashPreview(key)
-		if err != nil {
-			return value, err
-		}
-		value.HashValue = fields
-		markTruncated(&value, total, len(fields))
 
 	case "stream":
-		total, err := c.cmdable().XLen(c.ctx, key).Result()
-		if err != nil {
+		if err := c.fetchStream(key, &value, maxItems); err != nil {
 			return value, err
 		}
-		entries, err := c.cmdable().XRangeN(c.ctx, key, "-", "+", previewMaxItems).Result()
-		if err != nil {
-			return value, err
-		}
-		for _, entry := range entries {
-			value.StreamValue = append(value.StreamValue, types.StreamEntry{
-				ID:     entry.ID,
-				Fields: entry.Values,
-			})
-		}
-		markTruncated(&value, total, len(value.StreamValue))
 
 	case "ReJSON-RL":
 		val, err := c.do("JSON.GET", key, "$").Text()
@@ -119,23 +86,13 @@ func (c *Client) GetValuePreview(key string) (types.RedisValue, error) {
 	return value, nil
 }
 
-// markTruncated sets the Truncated/TotalCount fields when fewer entries were
-// fetched than exist.
-func markTruncated(value *types.RedisValue, total int64, fetched int) {
-	if total > int64(fetched) {
-		value.Truncated = true
-		value.TotalCount = total
-	}
-}
-
-// previewString fills in a bounded string preview, including HLL, protobuf, and
-// bitmap subtype detection on the fetched bytes.
-func (c *Client) previewString(key string, value *types.RedisValue) error {
+// fetchString fills a bounded string value, including HLL/protobuf/bitmap detection.
+func (c *Client) fetchString(key string, value *types.RedisValue, maxBytes int64, deferTruncatedBinary bool) error {
 	total, err := c.cmdable().StrLen(c.ctx, key).Result()
 	if err != nil {
 		return err
 	}
-	val, err := c.cmdable().GetRange(c.ctx, key, 0, previewMaxStringBytes-1).Result()
+	val, err := c.cmdable().GetRange(c.ctx, key, 0, maxBytes-1).Result()
 	if err != nil {
 		return err
 	}
@@ -150,8 +107,6 @@ func (c *Client) previewString(key string, value *types.RedisValue) error {
 		return nil
 	}
 
-	// Prefer protobuf (incl. s2-compressed) over bitmap: binary probes that are
-	// really compressed menus must not be labeled as bitmaps in the list UI.
 	if decoded, ok := decode.TryBinary([]byte(val)); ok {
 		value.Type = types.KeyTypeProtobuf
 		value.DecodedValue = decoded.Text
@@ -164,9 +119,7 @@ func (c *Client) previewString(key string, value *types.RedisValue) error {
 	binary := isBinaryString(val)
 	if value.Truncated {
 		binary = isBinaryPrefix(val)
-		// Incomplete binary blob may still be compressed protobuf that only
-		// decodes with the full payload — leave type as string until GetValue.
-		if binary {
+		if binary && deferTruncatedBinary {
 			return nil
 		}
 	}
@@ -180,33 +133,137 @@ func (c *Client) previewString(key string, value *types.RedisValue) error {
 	return nil
 }
 
-// scanSetPreview collects roughly previewMaxItems set members from a single
-// SSCAN iteration. COUNT is a hint, so slightly more or fewer entries may be
-// returned — the preview panel only displays a screenful either way.
-func (c *Client) scanSetPreview(key string) ([]string, error) {
-	members, _, err := c.cmdable().SScan(c.ctx, key, 0, "", previewMaxItems).Result()
-	return members, err
+// fetchList loads up to maxItems list elements.
+func (c *Client) fetchList(key string, value *types.RedisValue, maxItems int) error {
+	total, err := c.cmdable().LLen(c.ctx, key).Result()
+	if err != nil {
+		return err
+	}
+	vals, err := c.cmdable().LRange(c.ctx, key, 0, int64(maxItems)-1).Result()
+	if err != nil {
+		return err
+	}
+	value.ListValue = vals
+	markTruncated(value, total, len(vals))
+	return nil
 }
 
-// scanHashPreview collects roughly previewMaxItems hash fields from a single
-// HSCAN iteration (returned as flattened field/value pairs). COUNT is only a
-// hint, so servers may return more pairs than asked; inserts are capped so the
-// preview never materializes an unbounded map.
-func (c *Client) scanHashPreview(key string) (map[string]string, error) {
-	batch, _, err := c.cmdable().HScan(c.ctx, key, 0, "", previewMaxItems).Result()
+// fetchSet loads up to maxItems set members via SSCAN.
+func (c *Client) fetchSet(key string, value *types.RedisValue, maxItems int) error {
+	total, err := c.cmdable().SCard(c.ctx, key).Result()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	fields := make(map[string]string, previewMaxItems)
-	for i := 0; i+1 < len(batch) && len(fields) < previewMaxItems; i += 2 {
-		fields[batch[i]] = batch[i+1]
+	members, err := c.scanSetMembers(key, maxItems)
+	if err != nil {
+		return err
+	}
+	value.SetValue = members
+	markTruncated(value, total, len(members))
+	return nil
+}
+
+// fetchZSet loads up to maxItems sorted-set members and detects geo keys.
+func (c *Client) fetchZSet(key string, value *types.RedisValue, maxItems int) error {
+	total, err := c.cmdable().ZCard(c.ctx, key).Result()
+	if err != nil {
+		return err
+	}
+	vals, err := c.cmdable().ZRangeWithScores(c.ctx, key, 0, int64(maxItems)-1).Result()
+	if err != nil {
+		return err
+	}
+	for _, z := range vals {
+		value.ZSetValue = append(value.ZSetValue, types.ZSetMember{
+			Member: z.Member.(string),
+			Score:  z.Score,
+		})
+	}
+	markTruncated(value, total, len(value.ZSetValue))
+	c.detectGeo(key, value)
+	return nil
+}
+
+// fetchHash loads up to maxItems hash fields via HSCAN.
+func (c *Client) fetchHash(key string, value *types.RedisValue, maxItems int) error {
+	total, err := c.cmdable().HLen(c.ctx, key).Result()
+	if err != nil {
+		return err
+	}
+	fields, err := c.scanHashFields(key, maxItems)
+	if err != nil {
+		return err
+	}
+	value.HashValue = fields
+	markTruncated(value, total, len(fields))
+	return nil
+}
+
+// fetchStream loads up to maxItems stream entries.
+func (c *Client) fetchStream(key string, value *types.RedisValue, maxItems int) error {
+	total, err := c.cmdable().XLen(c.ctx, key).Result()
+	if err != nil {
+		return err
+	}
+	entries, err := c.cmdable().XRangeN(c.ctx, key, "-", "+", int64(maxItems)).Result()
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		value.StreamValue = append(value.StreamValue, types.StreamEntry{
+			ID:     entry.ID,
+			Fields: entry.Values,
+		})
+	}
+	markTruncated(value, total, len(value.StreamValue))
+	return nil
+}
+
+// scanSetMembers collects up to maxItems set members via SSCAN.
+func (c *Client) scanSetMembers(key string, maxItems int) ([]string, error) {
+	members := make([]string, 0, maxItems)
+	var cursor uint64
+	for len(members) < maxItems {
+		batch, next, err := c.cmdable().SScan(c.ctx, key, cursor, "", int64(maxItems)).Result()
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range batch {
+			members = append(members, m)
+			if len(members) >= maxItems {
+				break
+			}
+		}
+		cursor = next
+		if cursor == 0 {
+			break
+		}
+	}
+	return members, nil
+}
+
+// scanHashFields collects up to maxItems hash fields via HSCAN.
+func (c *Client) scanHashFields(key string, maxItems int) (map[string]string, error) {
+	fields := make(map[string]string, maxItems)
+	var cursor uint64
+	for len(fields) < maxItems {
+		batch, next, err := c.cmdable().HScan(c.ctx, key, cursor, "", int64(maxItems)).Result()
+		if err != nil {
+			return nil, err
+		}
+		for i := 0; i+1 < len(batch) && len(fields) < maxItems; i += 2 {
+			fields[batch[i]] = batch[i+1]
+		}
+		cursor = next
+		if cursor == 0 {
+			break
+		}
 	}
 	return fields, nil
 }
 
-// previewGeoDetect flips a zset preview to Geo when its scores look like
-// geohash integers, resolving coordinates for the previewed members.
-func (c *Client) previewGeoDetect(key string, value *types.RedisValue) {
+// detectGeo flips a zset to Geo when scores look like geohash integers.
+func (c *Client) detectGeo(key string, value *types.RedisValue) {
 	if len(value.ZSetValue) == 0 || !looksLikeGeoScores(value.ZSetValue) {
 		return
 	}

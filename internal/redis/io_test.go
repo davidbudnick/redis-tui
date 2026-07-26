@@ -993,29 +993,6 @@ func TestImportKeys_ReJSONWithTTL(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// queueValueFetch / extractValue — direct call with ReJSON-RL keyType
-// ---------------------------------------------------------------------------
-
-func TestQueueValueFetch_ReJSON(t *testing.T) {
-	client, _ := setupTestClient(t)
-
-	pipe := client.pipeline()
-	cmds := queueValueFetch(pipe, client.ctx, "jsonkey", "ReJSON-RL")
-	_, _ = pipe.Exec(client.ctx)
-
-	if cmds.jsonCmd == nil {
-		t.Error("expected jsonCmd to be set for ReJSON-RL keyType")
-	}
-
-	// extractValue should walk the ReJSON-RL branch (Text() will return an
-	// error from miniredis but the branch is still exercised).
-	val := extractValue("ReJSON-RL", cmds)
-	if val.Type != "ReJSON-RL" {
-		t.Errorf("Type = %q, want ReJSON-RL", val.Type)
-	}
-}
-
 func TestCompareKeys_StringSubtypes(t *testing.T) {
 	client, mr := setupTestClient(t)
 
@@ -1068,28 +1045,11 @@ func indexOfStr(s, sub string) int {
 	return -1
 }
 
-func TestExtractValue_AllTypes(t *testing.T) {
-	// Empty fetch cmds — verifies the nil-check branches in each case arm.
-	for _, kt := range []string{"string", "list", "set", "zset", "hash", "stream", "ReJSON-RL"} {
-		val := extractValue(kt, valueFetchCmds{})
-		if string(val.Type) != kt {
-			t.Errorf("Type = %q, want %q", val.Type, kt)
-		}
-	}
-
-	// Default branch — unknown type just sets Type and returns.
-	val := extractValue("unknown", valueFetchCmds{})
-	if string(val.Type) != "unknown" {
-		t.Errorf("Type = %q, want unknown", val.Type)
-	}
-}
-
 // ---------------------------------------------------------------------------
-// CompareKeys — TYPE pipeline error path. Use the fake server to make TYPE
-// return an error so the pipeline Exec returns a non-nil, non-redis.Nil err.
+// CompareKeys — GetValue error paths (first and second key).
 // ---------------------------------------------------------------------------
 
-func TestCompareKeys_TypeExecError(t *testing.T) {
+func TestCompareKeys_FirstKeyError(t *testing.T) {
 	srv := newFakeRedisServer(t)
 	srv.setHandler(func(argv []string) string {
 		if argv[0] == "TYPE" {
@@ -1105,13 +1065,63 @@ func TestCompareKeys_TypeExecError(t *testing.T) {
 	t.Cleanup(func() { _ = c.Disconnect() })
 
 	if _, _, err := c.CompareKeys("a", "b"); err == nil {
-		t.Error("expected error from CompareKeys when TYPE pipeline errors")
+		t.Error("expected error from CompareKeys when first GetValue fails")
+	}
+}
+
+func TestCompareKeys_SecondKeyError(t *testing.T) {
+	srv := newFakeRedisServer(t)
+	srv.setHandler(func(argv []string) string {
+		switch argv[0] {
+		case "TYPE":
+			if len(argv) > 1 && argv[1] == "b" {
+				return "-ERR injected\r\n"
+			}
+			return "+string\r\n"
+		case "STRLEN":
+			return ":5\r\n"
+		case "GETRANGE":
+			return respBulkString("hello")
+		}
+		return ""
+	})
+	host, port := srv.addr()
+	c := NewClient()
+	if err := c.Connect(types.Connection{Name: "test", Host: host, Port: port, DB: 0, UseCluster: false}); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	t.Cleanup(func() { _ = c.Disconnect() })
+
+	if _, _, err := c.CompareKeys("a", "b"); err == nil {
+		t.Error("expected error from CompareKeys when second GetValue fails")
+	}
+}
+
+func TestCompareKeys_TruncatesLargeValues(t *testing.T) {
+	client, mr := setupTestClient(t)
+	total := detailMaxItems + 25
+	for i := 0; i < total; i++ {
+		mr.RPush("cmpbig1", "x")
+		mr.RPush("cmpbig2", "y")
+	}
+
+	v1, v2, err := client.CompareKeys("cmpbig1", "cmpbig2")
+	if err != nil {
+		t.Fatalf("CompareKeys error: %v", err)
+	}
+	if len(v1.ListValue) != detailMaxItems || len(v2.ListValue) != detailMaxItems {
+		t.Errorf("list lengths = %d/%d, want %d/%d", len(v1.ListValue), len(v2.ListValue), detailMaxItems, detailMaxItems)
+	}
+	if !v1.Truncated || !v2.Truncated {
+		t.Error("expected both compare values Truncated = true")
+	}
+	if v1.TotalCount != int64(total) || v2.TotalCount != int64(total) {
+		t.Errorf("TotalCount = %d/%d, want %d/%d", v1.TotalCount, v2.TotalCount, total, total)
 	}
 }
 
 // ---------------------------------------------------------------------------
-// CompareKeys — exercise non-string types so queueValueFetch and extractValue
-// take their list/set/zset/hash/stream branches.
+// CompareKeys — exercise non-string types via the shared GetValue path.
 // ---------------------------------------------------------------------------
 
 func TestCompareKeys_AllTypes(t *testing.T) {
