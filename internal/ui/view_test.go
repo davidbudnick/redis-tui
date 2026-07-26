@@ -682,6 +682,30 @@ func TestPreviewFormattedAndTruncated(t *testing.T) {
 	}
 }
 
+func TestBuildDetailValueContent_Truncated(t *testing.T) {
+	out := buildDetailValueContent(types.RedisValue{
+		Type:       types.KeyTypeList,
+		ListValue:  []string{"a", "b"},
+		Truncated:  true,
+		TotalCount: 1500,
+	})
+	if !strings.Contains(out, "truncated") || !strings.Contains(out, "1500") {
+		t.Errorf("expected truncated marker, got %q", out)
+	}
+	if !strings.Contains(out, "a") {
+		t.Errorf("expected list body, got %q", out)
+	}
+
+	empty := buildDetailValueContent(types.RedisValue{
+		Type:       types.KeyTypeString,
+		Truncated:  true,
+		TotalCount: 42,
+	})
+	if !strings.Contains(empty, "truncated") || !strings.Contains(empty, "42") {
+		t.Errorf("expected truncated-only body, got %q", empty)
+	}
+}
+
 // BenchmarkViewKeyDetailLargeJSON measures one cached detail render frame.
 func BenchmarkViewKeyDetailLargeJSON(b *testing.B) {
 	var sb strings.Builder

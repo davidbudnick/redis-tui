@@ -4,7 +4,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/davidbudnick/redis-tui/internal/decode"
 	"github.com/davidbudnick/redis-tui/internal/types"
 	"github.com/redis/go-redis/v9"
 )
@@ -14,120 +13,9 @@ import (
 // large bitmap could allocate millions of entries.
 const maxBitPositions = 1024
 
-// GetValue retrieves the value for a key
+// GetValue retrieves a bounded detail value for a key (never unbounded dumps).
 func (c *Client) GetValue(key string) (types.RedisValue, error) {
-	keyType, err := c.cmdable().Type(c.ctx, key).Result()
-	if err != nil {
-		return types.RedisValue{}, err
-	}
-
-	var value types.RedisValue
-	value.Type = types.KeyType(keyType)
-
-	switch keyType {
-	case "string":
-		val, err := c.cmdable().Get(c.ctx, key).Result()
-		if err != nil {
-			return value, err
-		}
-		value.StringValue = val
-
-		// Detect HyperLogLog: raw value starts with "HYLL" magic bytes
-		if len(val) >= 4 && val[:4] == "HYLL" {
-			value.Type = types.KeyTypeHyperLogLog
-			count, err := c.cmdable().PFCount(c.ctx, key).Result()
-			if err == nil {
-				value.HLLCount = count
-			}
-		} else if decoded, ok := decode.TryBinary([]byte(val)); ok {
-			value.Type = types.KeyTypeProtobuf
-			value.DecodedValue = decoded.Text
-			value.DecodedFormat = decoded.Format
-			value.RawSize = decoded.RawSize
-			value.DecodedSize = decoded.DecodedSize
-		} else if isBinaryString(val) {
-			applyBinaryStringValue(&value, val, c, key)
-		}
-
-	case "list":
-		vals, err := c.cmdable().LRange(c.ctx, key, 0, -1).Result()
-		if err != nil {
-			return value, err
-		}
-		value.ListValue = vals
-
-	case "set":
-		vals, err := c.cmdable().SMembers(c.ctx, key).Result()
-		if err != nil {
-			return value, err
-		}
-		value.SetValue = vals
-
-	case "zset":
-		vals, err := c.cmdable().ZRangeWithScores(c.ctx, key, 0, -1).Result()
-		if err != nil {
-			return value, err
-		}
-		for _, z := range vals {
-			value.ZSetValue = append(value.ZSetValue, types.ZSetMember{
-				Member: z.Member.(string),
-				Score:  z.Score,
-			})
-		}
-
-		// Detect Geo: check if scores look like 52-bit geohash integers
-		if len(value.ZSetValue) > 0 && looksLikeGeoScores(value.ZSetValue) {
-			members := make([]string, len(value.ZSetValue))
-			for i, m := range value.ZSetValue {
-				members[i] = m.Member
-			}
-			positions, err := c.cmdable().GeoPos(c.ctx, key, members...).Result()
-			if err == nil {
-				var geoMembers []types.GeoMember
-				for i, pos := range positions {
-					if pos != nil {
-						geoMembers = append(geoMembers, types.GeoMember{
-							Name:      members[i],
-							Longitude: pos.Longitude,
-							Latitude:  pos.Latitude,
-						})
-					}
-				}
-				if len(geoMembers) > 0 {
-					value.Type = types.KeyTypeGeo
-					value.GeoValue = geoMembers
-				}
-			}
-		}
-
-	case "hash":
-		vals, err := c.cmdable().HGetAll(c.ctx, key).Result()
-		if err != nil {
-			return value, err
-		}
-		value.HashValue = vals
-
-	case "stream":
-		entries, err := c.cmdable().XRange(c.ctx, key, "-", "+").Result()
-		if err != nil {
-			return value, err
-		}
-		for _, entry := range entries {
-			value.StreamValue = append(value.StreamValue, types.StreamEntry{
-				ID:     entry.ID,
-				Fields: entry.Values,
-			})
-		}
-
-	case "ReJSON-RL":
-		val, err := c.do("JSON.GET", key, "$").Text()
-		if err != nil {
-			return value, err
-		}
-		value.JSONValue = val
-	}
-
-	return value, nil
+	return c.getValueBounded(key, detailMaxItems, detailMaxStringBytes, false)
 }
 
 // looksLikeGeoScores returns true if all sorted set scores look like 52-bit
@@ -153,16 +41,6 @@ func isBinaryString(s string) bool {
 		return false
 	}
 	return !utf8.ValidString(s)
-}
-
-// applyBinaryStringValue classifies remaining binary Redis strings as bitmaps.
-func applyBinaryStringValue(value *types.RedisValue, val string, c *Client, key string) {
-	value.Type = types.KeyTypeBitmap
-	count, err := c.cmdable().BitCount(c.ctx, key, &redis.BitCount{Start: 0, End: -1}).Result()
-	if err == nil {
-		value.BitCount = count
-	}
-	value.BitPositions = extractBitPositions([]byte(val), maxBitPositions)
 }
 
 // extractBitPositions returns up to max set bit offsets from raw bytes.

@@ -1,11 +1,9 @@
 package redis
 
 import (
-	"context"
 	"fmt"
 	"time"
 
-	"github.com/davidbudnick/redis-tui/internal/decode"
 	"github.com/davidbudnick/redis-tui/internal/types"
 	"github.com/redis/go-redis/v9"
 )
@@ -250,122 +248,15 @@ func (c *Client) ImportKeys(data map[string]any) (int, error) {
 	return count, nil
 }
 
-// CompareKeys compares two keys and returns their values.
-// Pipelines both TYPE commands and both value fetches to reduce round-trips from 4 to 2.
+// CompareKeys compares two keys using the same bounded GetValue path as detail.
 func (c *Client) CompareKeys(key1, key2 string) (types.RedisValue, types.RedisValue, error) {
-	// Pipeline 1: get both types
-	pipe := c.pipeline()
-	type1Cmd := pipe.Type(c.ctx, key1)
-	type2Cmd := pipe.Type(c.ctx, key2)
-	_, err := pipe.Exec(c.ctx)
-	if err != nil && err != redis.Nil {
-		return types.RedisValue{}, types.RedisValue{}, fmt.Errorf("error getting types: %w", err)
+	val1, err := c.GetValue(key1)
+	if err != nil {
+		return types.RedisValue{}, types.RedisValue{}, fmt.Errorf("error getting value for %s: %w", key1, err)
 	}
-
-	keyType1, _ := type1Cmd.Result()
-	keyType2, _ := type2Cmd.Result()
-
-	// Pipeline 2: get both values based on types
-	pipe = c.pipeline()
-	cmds1 := queueValueFetch(pipe, c.ctx, key1, keyType1)
-	cmds2 := queueValueFetch(pipe, c.ctx, key2, keyType2)
-	_, _ = pipe.Exec(c.ctx)
-
-	val1 := extractValue(keyType1, cmds1)
-	val2 := extractValue(keyType2, cmds2)
-
+	val2, err := c.GetValue(key2)
+	if err != nil {
+		return types.RedisValue{}, types.RedisValue{}, fmt.Errorf("error getting value for %s: %w", key2, err)
+	}
 	return val1, val2, nil
-}
-
-type valueFetchCmds struct {
-	strCmd    *redis.StringCmd
-	listCmd   *redis.StringSliceCmd
-	setCmd    *redis.StringSliceCmd
-	zsetCmd   *redis.ZSliceCmd
-	hashCmd   *redis.MapStringStringCmd
-	streamCmd *redis.XMessageSliceCmd
-	jsonCmd   *redis.Cmd
-}
-
-func queueValueFetch(pipe redis.Pipeliner, ctx context.Context, key, keyType string) valueFetchCmds {
-	var r valueFetchCmds
-	switch keyType {
-	case "string":
-		r.strCmd = pipe.Get(ctx, key)
-	case "list":
-		r.listCmd = pipe.LRange(ctx, key, 0, -1)
-	case "set":
-		r.setCmd = pipe.SMembers(ctx, key)
-	case "zset":
-		r.zsetCmd = pipe.ZRangeWithScores(ctx, key, 0, -1)
-	case "hash":
-		r.hashCmd = pipe.HGetAll(ctx, key)
-	case "stream":
-		r.streamCmd = pipe.XRange(ctx, key, "-", "+")
-	case "ReJSON-RL":
-		r.jsonCmd = pipe.Do(ctx, "JSON.GET", key, "$")
-	}
-	return r
-}
-
-func extractValue(keyType string, r valueFetchCmds) types.RedisValue {
-	var value types.RedisValue
-	value.Type = types.KeyType(keyType)
-
-	switch keyType {
-	case "string":
-		if r.strCmd != nil {
-			value.StringValue, _ = r.strCmd.Result()
-			if len(value.StringValue) >= 4 && value.StringValue[:4] == "HYLL" {
-				value.Type = types.KeyTypeHyperLogLog
-			} else if decoded, ok := decode.TryBinary([]byte(value.StringValue)); ok {
-				value.Type = types.KeyTypeProtobuf
-				value.DecodedValue = decoded.Text
-				value.DecodedFormat = decoded.Format
-				value.RawSize = decoded.RawSize
-				value.DecodedSize = decoded.DecodedSize
-			} else if isBinaryString(value.StringValue) {
-				value.Type = types.KeyTypeBitmap
-				value.BitPositions = extractBitPositions([]byte(value.StringValue), maxBitPositions)
-			}
-		}
-	case "list":
-		if r.listCmd != nil {
-			value.ListValue, _ = r.listCmd.Result()
-		}
-	case "set":
-		if r.setCmd != nil {
-			value.SetValue, _ = r.setCmd.Result()
-		}
-	case "zset":
-		if r.zsetCmd != nil {
-			vals, _ := r.zsetCmd.Result()
-			for _, z := range vals {
-				value.ZSetValue = append(value.ZSetValue, types.ZSetMember{
-					Member: z.Member.(string),
-					Score:  z.Score,
-				})
-			}
-		}
-	case "hash":
-		if r.hashCmd != nil {
-			value.HashValue, _ = r.hashCmd.Result()
-		}
-	case "stream":
-		if r.streamCmd != nil {
-			entries, _ := r.streamCmd.Result()
-			for _, entry := range entries {
-				value.StreamValue = append(value.StreamValue, types.StreamEntry{
-					ID:     entry.ID,
-					Fields: entry.Values,
-				})
-			}
-		}
-	case "ReJSON-RL":
-		if r.jsonCmd != nil {
-			value.JSONValue, _ = r.jsonCmd.Text()
-		}
-	}
-
-	return value
 }
