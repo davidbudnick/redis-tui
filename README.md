@@ -54,11 +54,9 @@ go install github.com/davidbudnick/redis-tui@latest
 
 - **CLI quick connect** — pass `--host`, `--port`, `--user`, `--password`, etc. to connect without a config file
 - **Connection manager** — save and switch between multiple Redis instances
-- **TLS/SSL** encryption support
-- **SSH tunneling** for secure remote access
-- **Connection groups** to organize instances
+- **TLS/SSL** — enable via CLI flags (`--tls`, `--tls-ca`, etc.) or config file fields; the add/edit connection form does not expose TLS options yet
 - **Database switching** between Redis databases (0-15)
-- **Cluster support** — connect to any cluster node and press `K` to view all nodes, their roles (master/replica), slot ranges, and link state; cluster metrics in the live dashboard
+- **Cluster support** — connect to any cluster node and press `C` to view all nodes, their roles (master/replica), slot ranges, and link state; cluster metrics in the live dashboard
 
 ### Monitoring and Operations
 
@@ -67,14 +65,22 @@ go install github.com/davidbudnick/redis-tui@latest
 - **Memory stats** — detailed usage breakdown and top keys by memory consumption
 - **Slow log** — view slow query entries with execution time and command details
 - **Client list** — view all connected Redis clients with address, age, and command info
-- **Watch mode** — monitor key values for changes in real-time with configurable interval
 - **Keyspace events** — subscribe to keyspace notifications (set, del, expire, etc.)
 - **Export/Import** — JSON-based key backup and restore
 - **Bulk operations** — pattern-based delete and batch TTL across multiple keys
 - **Redis config** — browse and edit runtime CONFIG parameters
 - **Pub/Sub** — browse active channels with subscriber counts and publish messages
 - **Lua scripting** — execute Lua scripts directly against the server
-- **Themes** — switch between color themes
+
+### Coming soon / roadmap
+
+These items have schema hooks or partial stubs in the codebase but are **not fully implemented** yet:
+
+- **SSH tunneling** — `use_ssh` / `ssh_config` are reserved in config for future secure remote access (no SSH client yet)
+- **Connection groups** — groups can be stored in config; no UI for browsing or assigning groups yet
+- **Watch mode** — key-detail `w` can toggle a watch flag, but value refresh is not wired up; `watch_interval_ms` is unused by the UI
+- **Themes** — no theme system yet (`ctrl+t` is used for test connection / add-key type cycle, not themes)
+- **TLS in connection form** — TLS works via CLI and config file; form UI for certs/CA is planned
 
 ## Installation
 
@@ -229,11 +235,11 @@ rm -f $(go env GOPATH)/bin/redis-tui
 | --------------- | ------------------------ | ----- | ------------------------- |
 | `e`             | Edit value (string/json) | `r`   | Refresh value             |
 | `a`             | Add to collection        | `f`   | Toggle favorite           |
-| `x`             | Remove from collection   | `w`   | Watch for changes         |
-| `t`             | Set TTL                  | `h`   | View value history        |
-| `R`             | Rename key               | `y`   | Copy to clipboard         |
-| `c`             | Copy key                 | `J`   | JSON path query           |
-| `d/delete`      | Delete key               | `j/k` | Navigate collection items |
+| `x`             | Remove from collection   | `h`   | View value history        |
+| `t`             | Set TTL                  | `y`   | Copy to clipboard         |
+| `R`             | Rename key               | `J`   | JSON path query           |
+| `c`             | Copy key                 | `j/k` | Navigate collection items |
+| `d/delete`      | Delete key               |       |                           |
 | `esc/backspace` | Go back to keys list     |       |                           |
 
 </details>
@@ -368,6 +374,8 @@ Configuration is stored in `~/.config/redis-tui/config.json`.
 
 > **TTL format:** `default_ttl` values in templates use Go's `time.Duration` nanosecond encoding: 1s = `1000000000`, 1m = `60000000000`, 1h = `3600000000000`.
 
+> **Reserved / planned fields:** `groups`, `group`, `use_ssh`, `ssh_config`, and `watch_interval_ms` are kept for forward compatibility. SSH tunneling, connection-group UI, and functional watch mode are not implemented yet (see [Coming soon / roadmap](#coming-soon--roadmap)).
+
 ### Connection Options
 
 | Option                            | Description                                                 |
@@ -378,21 +386,21 @@ Configuration is stored in `~/.config/redis-tui/config.json`.
 | `password`                        | Redis password (never saved to disk)                        |
 | `db`                              | Redis database number (0-15)                                |
 | `username`                        | Redis ACL username (optional)                               |
-| `group`                           | Connection group name (optional)                            |
+| `group`                           | Connection group name (optional; UI not wired yet)          |
 | `color`                           | Display color for the connection (optional)                 |
-| `use_tls`                         | Enable TLS/SSL connection                                   |
+| `use_tls`                         | Enable TLS/SSL connection (CLI/config; not in form UI yet)  |
 | `tls_config.cert_file`            | Client certificate file path                                |
 | `tls_config.key_file`             | Client key file path                                        |
 | `tls_config.ca_file`              | CA certificate file path                                    |
 | `tls_config.insecure_skip_verify` | Skip TLS certificate verification                           |
 | `tls_config.server_name`          | TLS server name for verification                            |
-| `use_ssh`                         | Enable SSH tunneling                                        |
-| `ssh_config.host`                 | SSH server hostname                                         |
-| `ssh_config.port`                 | SSH server port                                             |
-| `ssh_config.user`                 | SSH username                                                |
-| `ssh_config.password`             | SSH password (never saved to disk)                          |
-| `ssh_config.private_key_path`     | Path to SSH private key file                                |
-| `ssh_config.passphrase`           | Passphrase for encrypted private key (never saved to disk)  |
+| `use_ssh`                         | Reserved: enable SSH tunneling (not implemented yet)        |
+| `ssh_config.host`                 | Reserved: SSH server hostname                               |
+| `ssh_config.port`                 | Reserved: SSH server port                                   |
+| `ssh_config.user`                 | Reserved: SSH username                                      |
+| `ssh_config.password`             | Reserved: SSH password (never saved to disk)                |
+| `ssh_config.private_key_path`     | Reserved: path to SSH private key file                      |
+| `ssh_config.passphrase`           | Reserved: passphrase for encrypted key (never saved)        |
 | `use_cluster`                     | Enable Redis cluster mode                                   |
 
 ## Requirements

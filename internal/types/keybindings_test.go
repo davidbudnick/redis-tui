@@ -33,8 +33,8 @@ func TestGetBindingsList(t *testing.T) {
 	bindings := kb.GetBindingsList()
 
 	t.Run("correct count", func(t *testing.T) {
-		if len(bindings) != 41 {
-			t.Errorf("GetBindingsList() returned %d entries, want 41", len(bindings))
+		if len(bindings) != 40 {
+			t.Errorf("GetBindingsList() returned %d entries, want 40", len(bindings))
 		}
 	})
 

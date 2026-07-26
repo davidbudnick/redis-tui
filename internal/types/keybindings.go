@@ -153,7 +153,6 @@ func (kb KeyBindings) GetBindingsList() []KeyBinding {
 		{Key: kb.JSONPath, Description: "JSON path query", Action: "json_path"},
 		{Key: kb.CopyClipboard, Description: "Copy to clipboard", Action: "copy_clipboard"},
 		{Key: kb.Logs, Description: "View logs", Action: "logs"},
-		{Key: kb.Themes, Description: "Change theme", Action: "themes"},
 		{Key: kb.RecentKeys, Description: "Recent keys", Action: "recent_keys"},
 		{Key: kb.Favorites, Description: "Favorites", Action: "favorites"},
 		{Key: kb.ValueHistory, Description: "Value history", Action: "value_history"},
