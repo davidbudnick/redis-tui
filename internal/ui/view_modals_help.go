@@ -88,7 +88,6 @@ func (m Model) viewHelp() string {
 				{"t", "Set TTL"},
 				{"r", "Refresh"},
 				{"f", "Toggle favorite"},
-				{"w", "Watch for changes"},
 				{"h", "Value history"},
 				{"y", "Copy to clipboard"},
 				{"J", "JSON path query"},
