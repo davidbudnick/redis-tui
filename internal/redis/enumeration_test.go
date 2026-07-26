@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"container/heap"
 	"fmt"
 	"sort"
 	"strings"
@@ -702,7 +703,7 @@ func TestFuzzySearchKeys_ScanError(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// SearchByValue — scanAll error path.
+// SearchByValue — scanEach error path.
 // ---------------------------------------------------------------------------
 
 func TestSearchByValue_ScanError(t *testing.T) {
@@ -1140,5 +1141,300 @@ func BenchmarkScanKeysProtobufMenus(b *testing.B) {
 		if _, _, err := client.ScanKeys("menu:v4:*", 0, 100); err != nil {
 			b.Fatalf("ScanKeys: %v", err)
 		}
+	}
+}
+
+func TestFuzzySearchKeys_TopNOnLargeKeyspace(t *testing.T) {
+	client, mr := setupTestClient(t)
+
+	for i := 0; i < 500; i++ {
+		mr.Set(fmt.Sprintf("noise:%04d", i), "v")
+	}
+	// Longer substring matches score higher: 100 + (len - len("target"))
+	mr.Set("target", "exact")
+	mr.Set("target:short", "a")
+	mr.Set("target:medium:key", "b")
+	mr.Set("target:the:longest:match:key", "c")
+	for i := 0; i < 200; i++ {
+		mr.Set(fmt.Sprintf("target:bulk:%04d", i), "v")
+	}
+
+	results, err := client.FuzzySearchKeys("target", 5)
+	if err != nil {
+		t.Fatalf("FuzzySearchKeys error: %v", err)
+	}
+	if len(results) != 5 {
+		t.Fatalf("results length = %d, want 5", len(results))
+	}
+
+	// Highest substring score among seeded keys is the longest containing "target".
+	if results[0].Key != "target:the:longest:match:key" {
+		t.Errorf("top result = %q, want target:the:longest:match:key", results[0].Key)
+	}
+	for _, r := range results {
+		if !strings.Contains(strings.ToLower(r.Key), "target") {
+			t.Errorf("unexpected key %q in top-N", r.Key)
+		}
+		if r.Type == "" {
+			t.Errorf("key %q missing type", r.Key)
+		}
+	}
+}
+
+func TestFuzzySearchKeys_DefaultMaxKeys(t *testing.T) {
+	client, mr := setupTestClient(t)
+
+	for i := 0; i < 5; i++ {
+		mr.Set(fmt.Sprintf("user:%d", i), "v")
+	}
+
+	results, err := client.FuzzySearchKeys("user", 0)
+	if err != nil {
+		t.Fatalf("FuzzySearchKeys error: %v", err)
+	}
+	if len(results) != 5 {
+		t.Fatalf("results length = %d, want 5 (default maxKeys path)", len(results))
+	}
+
+	results, err = client.FuzzySearchKeys("user", -3)
+	if err != nil {
+		t.Fatalf("FuzzySearchKeys negative maxKeys error: %v", err)
+	}
+	if len(results) != 5 {
+		t.Fatalf("results length = %d, want 5 for negative maxKeys", len(results))
+	}
+}
+
+func TestScoreMinHeapConsider(t *testing.T) {
+	var h scoreMinHeap
+	h.consider(scoredKey{key: "a", score: 10}, 0)
+	if h.Len() != 0 {
+		t.Fatalf("consider with maxKeys=0 should keep empty heap, got %d", h.Len())
+	}
+
+	h.consider(scoredKey{key: "low", score: 1}, 2)
+	h.consider(scoredKey{key: "mid", score: 5}, 2)
+	h.consider(scoredKey{key: "high", score: 9}, 2)
+	h.consider(scoredKey{key: "lower", score: 0}, 2)
+	if h.Len() != 2 {
+		t.Fatalf("heap len = %d, want 2", h.Len())
+	}
+
+	got := map[string]int{}
+	for h.Len() > 0 {
+		sk := heap.Pop(&h).(scoredKey)
+		got[sk.key] = sk.score
+	}
+	if _, ok := got["high"]; !ok {
+		t.Errorf("expected high in heap, got %v", got)
+	}
+	if _, ok := got["mid"]; !ok {
+		t.Errorf("expected mid in heap, got %v", got)
+	}
+	if _, ok := got["low"]; ok {
+		t.Errorf("low should have been evicted, got %v", got)
+	}
+}
+
+func TestSearchByValue_EarlyStopAtMaxKeys(t *testing.T) {
+	client, mr := setupTestClient(t)
+
+	// Far more matching keys than maxKeys; scan must stop once maxKeys matches.
+	for i := 0; i < 300; i++ {
+		mr.Set(fmt.Sprintf("sv:%04d", i), "needle-value")
+	}
+
+	results, err := client.SearchByValue("*", "needle", 7)
+	if err != nil {
+		t.Fatalf("SearchByValue error: %v", err)
+	}
+	if len(results) != 7 {
+		t.Fatalf("results length = %d, want 7", len(results))
+	}
+}
+
+func TestSearchByValue_GetRangePrefixMatch(t *testing.T) {
+	client, mr := setupTestClient(t)
+
+	// Needle near the start of a large string; GETRANGE prefix must still match.
+	large := "prefix-needle-" + strings.Repeat("x", int(searchMaxStringBytes)+4096)
+	mr.Set("big:string", large)
+
+	// Non-matching large string to exercise the miss path.
+	mr.Set("big:other", strings.Repeat("z", int(searchMaxStringBytes)+1024))
+
+	results, err := client.SearchByValue("big:*", "needle", 10)
+	if err != nil {
+		t.Fatalf("SearchByValue error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("results length = %d, want 1", len(results))
+	}
+	if results[0].Key != "big:string" {
+		t.Errorf("key = %q, want big:string", results[0].Key)
+	}
+	if results[0].Type != types.KeyTypeString {
+		t.Errorf("type = %q, want string", results[0].Type)
+	}
+}
+
+func TestSearchByValue_BoundedCollections(t *testing.T) {
+	client, mr := setupTestClient(t)
+
+	mr.RPush("list:hit", "has-needle-here")
+	for i := 0; i < searchMaxItems+50; i++ {
+		mr.RPush("list:hit", fmt.Sprintf("item-%d", i))
+	}
+
+	mr.HSet("hash:hit", "f1", "plain")
+	mr.HSet("hash:hit", "f2", "contains-needle")
+	mr.SAdd("set:hit", "alpha", "needle-member", "beta")
+
+	// Non-matching collection entries must not match or panic.
+	mr.RPush("list:miss", "foo", "bar")
+	mr.HSet("hash:miss", "f", "plain")
+	mr.SAdd("set:miss", "alpha", "beta")
+	mr.Set("str:miss", "nothing-here")
+
+	results, err := client.SearchByValue("*", "needle", 10)
+	if err != nil {
+		t.Fatalf("SearchByValue error: %v", err)
+	}
+
+	found := map[string]bool{}
+	for _, r := range results {
+		found[r.Key] = true
+	}
+	for _, want := range []string{"list:hit", "hash:hit", "set:hit"} {
+		if !found[want] {
+			t.Errorf("missing expected key %q in %v", want, found)
+		}
+	}
+	for _, unwant := range []string{"list:miss", "hash:miss", "set:miss", "str:miss"} {
+		if found[unwant] {
+			t.Errorf("unexpected non-match key %q", unwant)
+		}
+	}
+}
+
+func TestSearchByValue_EmptyAndMissingNoPanic(t *testing.T) {
+	client, mr := setupTestClient(t)
+
+	// Empty DB / missing keys must not panic.
+	results, err := client.SearchByValue("*", "needle", 10)
+	if err != nil {
+		t.Fatalf("SearchByValue empty db error: %v", err)
+	}
+	if len(results) != 0 {
+		t.Errorf("expected 0 results on empty db, got %d", len(results))
+	}
+
+	mr.Set("present", "hello")
+
+	results, err = client.SearchByValue("missing:*", "needle", 10)
+	if err != nil {
+		t.Fatalf("SearchByValue missing pattern error: %v", err)
+	}
+	if len(results) != 0 {
+		t.Errorf("expected 0 results for missing pattern, got %d", len(results))
+	}
+
+	results, err = client.SearchByValue("", "hello", 10)
+	if err != nil {
+		t.Fatalf("SearchByValue empty pattern error: %v", err)
+	}
+	if len(results) != 1 || results[0].Key != "present" {
+		t.Errorf("empty pattern results = %v, want [present]", results)
+	}
+
+	results, err = client.SearchByValue("*", "hello", 0)
+	if err != nil {
+		t.Fatalf("SearchByValue default maxKeys error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Errorf("default maxKeys results = %d, want 1", len(results))
+	}
+
+	results, err = client.SearchByValue("*", "hello", -1)
+	if err != nil {
+		t.Fatalf("SearchByValue negative maxKeys error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Errorf("negative maxKeys results = %d, want 1", len(results))
+	}
+}
+
+func TestValueCmdMatches_NilAndBranches(t *testing.T) {
+	if valueCmdMatches("string", "x", nil, nil, nil, nil, nil) {
+		t.Error("nil string cmd should not match")
+	}
+	if valueCmdMatches("hash", "x", nil, nil, nil, nil, nil) {
+		t.Error("nil hash cmd should not match")
+	}
+	if valueCmdMatches("list", "x", nil, nil, nil, nil, nil) {
+		t.Error("nil list cmd should not match")
+	}
+	if valueCmdMatches("set", "x", nil, nil, nil, nil, nil) {
+		t.Error("nil set cmd should not match")
+	}
+	if valueCmdMatches("ReJSON-RL", "x", nil, nil, nil, nil, nil) {
+		t.Error("nil json cmd should not match")
+	}
+	if valueCmdMatches("zset", "x", nil, nil, nil, nil, nil) {
+		t.Error("unsupported type should not match")
+	}
+}
+
+func TestSearchByValue_HashFieldNoValueMatch(t *testing.T) {
+	client, mr := setupTestClient(t)
+
+	// Field name contains needle but value does not — hash match checks values only.
+	mr.HSet("hash:fieldonly", "needle-field", "plain-value")
+	mr.HSet("hash:valuehit", "f", "has-needle")
+
+	results, err := client.SearchByValue("*", "needle", 10)
+	if err != nil {
+		t.Fatalf("SearchByValue error: %v", err)
+	}
+	found := map[string]bool{}
+	for _, r := range results {
+		found[r.Key] = true
+	}
+	if !found["hash:valuehit"] {
+		t.Error("expected hash:valuehit")
+	}
+	if found["hash:fieldonly"] {
+		t.Error("hash field names must not match; only values")
+	}
+}
+
+func TestSearchByValue_ReJSONTextError(t *testing.T) {
+	srv := newFakeRedisServer(t)
+	srv.setHandler(func(argv []string) string {
+		switch argv[0] {
+		case "SCAN":
+			return "*2\r\n$1\r\n0\r\n*1\r\n$5\r\nkjson\r\n"
+		case "TYPE":
+			return "+ReJSON-RL\r\n"
+		case "JSON.GET":
+			return "-ERR injected\r\n"
+		case "TTL":
+			return ":-1\r\n"
+		}
+		return ""
+	})
+	host, port := srv.addr()
+	c := NewClient()
+	if err := c.Connect(types.Connection{Name: "test", Host: host, Port: port, DB: 0, UseCluster: false}); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	t.Cleanup(func() { _ = c.Disconnect() })
+
+	results, err := c.SearchByValue("*", "needle", 10)
+	if err != nil {
+		t.Fatalf("SearchByValue error: %v", err)
+	}
+	if len(results) != 0 {
+		t.Errorf("expected 0 results when JSON.GET errors, got %v", results)
 	}
 }

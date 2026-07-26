@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"container/heap"
 	"fmt"
 	"regexp"
 	"sort"
@@ -112,6 +113,14 @@ const (
 	// classification when a short probe looks binary but is not yet classifiable
 	// (e.g. s2-compressed protobuf needs the complete blob to decode).
 	subtypeFullFetchMax int64 = 512 * 1024
+	// defaultSearchMaxKeys is used when callers pass maxKeys <= 0.
+	defaultSearchMaxKeys = 100
+	// searchMaxStringBytes caps string bytes inspected during value search
+	// (GETRANGE prefix). Matches outside this window may be missed.
+	searchMaxStringBytes int64 = previewMaxStringBytes
+	// searchMaxItems caps collection entries inspected during value search.
+	// Matches beyond this prefix window may be missed.
+	searchMaxItems = previewMaxItems
 )
 
 // ScanKeysWithRegex scans keys using regex pattern with early termination.
@@ -172,53 +181,46 @@ func (c *Client) ScanKeysWithRegex(regexPattern string, maxKeys int) ([]types.Re
 }
 
 // FuzzySearchKeys performs fuzzy matching on key names.
-// Scans incrementally to avoid holding the full keyspace in memory.
+// Scans the full keyspace for correct global top-N, keeping only O(maxKeys) scored candidates.
 func (c *Client) FuzzySearchKeys(searchTerm string, maxKeys int) ([]types.RedisKey, error) {
+	if maxKeys <= 0 {
+		maxKeys = defaultSearchMaxKeys
+	}
 	searchLower := strings.ToLower(searchTerm)
 
-	type scoredKey struct {
-		key   string
-		score int
-	}
-	var scoredKeys []scoredKey
-
+	top := make(scoreMinHeap, 0, maxKeys)
 	err := c.scanEach("*", scanBatchDefault, func(keys []string) bool {
 		for _, key := range keys {
-			keyLower := strings.ToLower(key)
-			score := fuzzyScore(keyLower, searchLower)
+			score := fuzzyScore(strings.ToLower(key), searchLower)
 			if score > 0 {
-				scoredKeys = append(scoredKeys, scoredKey{key: key, score: score})
+				top.consider(scoredKey{key: key, score: score}, maxKeys)
 			}
 		}
-		return true // must scan all keys for global top-N
+		return true
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	// Sort by score descending
-	sort.Slice(scoredKeys, func(i, j int) bool {
-		return scoredKeys[i].score > scoredKeys[j].score
-	})
-
-	// Limit to maxKeys
-	limit := min(maxKeys, len(scoredKeys))
-	scoredKeys = scoredKeys[:limit]
-
-	if len(scoredKeys) == 0 {
+	if top.Len() == 0 {
 		return []types.RedisKey{}, nil
 	}
 
-	// Use pipeline to batch Type and TTL calls for top results only
+	scoredKeys := make([]scoredKey, top.Len())
+	for i := len(scoredKeys) - 1; i >= 0; i-- {
+		scoredKeys[i] = heap.Pop(&top).(scoredKey)
+	}
+	sort.SliceStable(scoredKeys, func(i, j int) bool {
+		return scoredKeys[i].score > scoredKeys[j].score
+	})
+
 	pipe := c.pipeline()
 	typeCmds := make([]*redis.StatusCmd, len(scoredKeys))
 	ttlCmds := make([]*redis.DurationCmd, len(scoredKeys))
-
 	for i, sk := range scoredKeys {
 		typeCmds[i] = pipe.Type(c.ctx, sk.key)
 		ttlCmds[i] = pipe.TTL(c.ctx, sk.key)
 	}
-
 	_, _ = pipe.Exec(c.ctx)
 
 	result := make([]types.RedisKey, len(scoredKeys))
@@ -231,8 +233,42 @@ func (c *Client) FuzzySearchKeys(searchTerm string, maxKeys int) ([]types.RedisK
 			TTL:  ttl,
 		}
 	}
-
 	return result, nil
+}
+
+type scoredKey struct {
+	key   string
+	score int
+}
+
+type scoreMinHeap []scoredKey
+
+func (h scoreMinHeap) Len() int           { return len(h) }
+func (h scoreMinHeap) Less(i, j int) bool { return h[i].score < h[j].score }
+func (h scoreMinHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+func (h *scoreMinHeap) Push(x any) { *h = append(*h, x.(scoredKey)) }
+
+func (h *scoreMinHeap) Pop() any {
+	old := *h
+	n := len(old)
+	item := old[n-1]
+	*h = old[:n-1]
+	return item
+}
+
+func (h *scoreMinHeap) consider(sk scoredKey, maxKeys int) {
+	if maxKeys <= 0 {
+		return
+	}
+	if h.Len() < maxKeys {
+		heap.Push(h, sk)
+		return
+	}
+	if sk.score > (*h)[0].score {
+		(*h)[0] = sk
+		heap.Fix(h, 0)
+	}
 }
 
 func fuzzyScore(str, pattern string) int {
@@ -260,11 +296,14 @@ func fuzzyScore(str, pattern string) int {
 }
 
 // SearchByValue searches for keys containing a value.
-// Uses 2 pipelines per chunk (TYPE + values) and defers TTL to a single final pipeline.
+// Streams SCAN batches, bounds value fetches to a prefix window, and stops at maxKeys.
+// Matches outside the inspected prefix (string/collection window) may be missed.
 func (c *Client) SearchByValue(pattern string, valueSearch string, maxKeys int) ([]types.RedisKey, error) {
-	allKeys, err := c.scanAll(pattern, scanBatchDefault)
-	if err != nil {
-		return nil, err
+	if maxKeys <= 0 {
+		maxKeys = defaultSearchMaxKeys
+	}
+	if pattern == "" {
+		pattern = "*"
 	}
 
 	type match struct {
@@ -273,13 +312,7 @@ func (c *Client) SearchByValue(pattern string, valueSearch string, maxKeys int) 
 	}
 	matches := make([]match, 0, maxKeys)
 
-	// Process in chunks to keep pipeline sizes reasonable
-	chunkSize := int(scanBatchDefault)
-	for i := 0; i < len(allKeys) && len(matches) < maxKeys; i += chunkSize {
-		end := min(i+chunkSize, len(allKeys))
-		keys := allKeys[i:end]
-
-		// Pipeline 1: get types for all keys
+	err := c.scanEach(pattern, scanBatchDefault, func(keys []string) bool {
 		typePipe := c.pipeline()
 		typeCmds := make([]*redis.StatusCmd, len(keys))
 		for j, key := range keys {
@@ -292,15 +325,14 @@ func (c *Client) SearchByValue(pattern string, valueSearch string, maxKeys int) 
 			keyTypes[j], _ = typeCmds[j].Result()
 		}
 
-		// Pipeline 2: get values based on type
 		valuePipe := c.pipeline()
 		type valueCmd struct {
 			idx     int
 			keyType string
 			strCmd  *redis.StringCmd
-			hashCmd *redis.MapStringStringCmd
+			hashCmd *redis.ScanCmd
 			listCmd *redis.StringSliceCmd
-			setCmd  *redis.StringSliceCmd
+			setCmd  *redis.ScanCmd
 			jsonCmd *redis.Cmd
 		}
 		valueCmds := make([]valueCmd, 0, len(keys))
@@ -310,13 +342,13 @@ func (c *Client) SearchByValue(pattern string, valueSearch string, maxKeys int) 
 			vc := valueCmd{idx: j, keyType: kt}
 			switch kt {
 			case "string":
-				vc.strCmd = valuePipe.Get(c.ctx, key)
+				vc.strCmd = valuePipe.GetRange(c.ctx, key, 0, searchMaxStringBytes-1)
 			case "hash":
-				vc.hashCmd = valuePipe.HGetAll(c.ctx, key)
+				vc.hashCmd = valuePipe.HScan(c.ctx, key, 0, "", int64(searchMaxItems))
 			case "list":
-				vc.listCmd = valuePipe.LRange(c.ctx, key, 0, -1)
+				vc.listCmd = valuePipe.LRange(c.ctx, key, 0, int64(searchMaxItems-1))
 			case "set":
-				vc.setCmd = valuePipe.SMembers(c.ctx, key)
+				vc.setCmd = valuePipe.SScan(c.ctx, key, 0, "", int64(searchMaxItems))
 			case "ReJSON-RL":
 				vc.jsonCmd = valuePipe.Do(c.ctx, "JSON.GET", key, "$")
 			default:
@@ -324,57 +356,28 @@ func (c *Client) SearchByValue(pattern string, valueSearch string, maxKeys int) 
 			}
 			valueCmds = append(valueCmds, vc)
 		}
-		_, _ = valuePipe.Exec(c.ctx)
+		if len(valueCmds) > 0 {
+			_, _ = valuePipe.Exec(c.ctx)
+		}
 
-		// Find matching keys
 		for _, vc := range valueCmds {
-			found := false
-			switch vc.keyType {
-			case "string":
-				val, _ := vc.strCmd.Result()
-				found = strings.Contains(val, valueSearch)
-			case "hash":
-				vals, _ := vc.hashCmd.Result()
-				for _, v := range vals {
-					if strings.Contains(v, valueSearch) {
-						found = true
-						break
-					}
-				}
-			case "list":
-				vals, _ := vc.listCmd.Result()
-				for _, v := range vals {
-					if strings.Contains(v, valueSearch) {
-						found = true
-						break
-					}
-				}
-			case "set":
-				vals, _ := vc.setCmd.Result()
-				for _, v := range vals {
-					if strings.Contains(v, valueSearch) {
-						found = true
-						break
-					}
-				}
-			case "ReJSON-RL":
-				val, _ := vc.jsonCmd.Text()
-				found = strings.Contains(val, valueSearch)
-			}
-			if found {
+			if valueCmdMatches(vc.keyType, valueSearch, vc.strCmd, vc.hashCmd, vc.listCmd, vc.setCmd, vc.jsonCmd) {
 				matches = append(matches, match{key: keys[vc.idx], keyType: keyTypes[vc.idx]})
 				if len(matches) >= maxKeys {
-					break
+					return false
 				}
 			}
 		}
+		return true
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	if len(matches) == 0 {
 		return []types.RedisKey{}, nil
 	}
 
-	// Single final pipeline for TTL of all matches
 	ttlPipe := c.pipeline()
 	ttlCmds := make([]*redis.DurationCmd, len(matches))
 	for j, m := range matches {
@@ -391,8 +394,65 @@ func (c *Client) SearchByValue(pattern string, valueSearch string, maxKeys int) 
 			TTL:  ttl,
 		}
 	}
-
 	return result, nil
+}
+
+func valueCmdMatches(
+	keyType, valueSearch string,
+	strCmd *redis.StringCmd,
+	hashCmd *redis.ScanCmd,
+	listCmd *redis.StringSliceCmd,
+	setCmd *redis.ScanCmd,
+	jsonCmd *redis.Cmd,
+) bool {
+	switch keyType {
+	case "string":
+		if strCmd == nil {
+			return false
+		}
+		val, _ := strCmd.Result()
+		return strings.Contains(val, valueSearch)
+	case "hash":
+		if hashCmd == nil {
+			return false
+		}
+		batch, _, _ := hashCmd.Result()
+		for i := 0; i+1 < len(batch); i += 2 {
+			if strings.Contains(batch[i+1], valueSearch) {
+				return true
+			}
+		}
+	case "list":
+		if listCmd == nil {
+			return false
+		}
+		vals, _ := listCmd.Result()
+		for _, v := range vals {
+			if strings.Contains(v, valueSearch) {
+				return true
+			}
+		}
+	case "set":
+		if setCmd == nil {
+			return false
+		}
+		vals, _, _ := setCmd.Result()
+		for _, v := range vals {
+			if strings.Contains(v, valueSearch) {
+				return true
+			}
+		}
+	case "ReJSON-RL":
+		if jsonCmd == nil {
+			return false
+		}
+		val, err := jsonCmd.Text()
+		if err != nil {
+			return false
+		}
+		return strings.Contains(val, valueSearch)
+	}
+	return false
 }
 
 // GetKeyPrefixes returns all unique key prefixes (for tree view).
