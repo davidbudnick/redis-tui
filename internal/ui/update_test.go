@@ -68,6 +68,55 @@ func TestUpdate_SearchDebounceMsg(t *testing.T) {
 	})
 }
 
+func TestUpdate_PreviewDebounceMsg(t *testing.T) {
+	t.Run("matching seq and key loads preview", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.Keys = []types.RedisKey{{Key: "foo"}, {Key: "bar"}}
+		m.SelectedKeyIdx = 1
+		m.PreviewSeq = 3
+		_, cmd := m.Update(types.PreviewDebounceMsg{Seq: 3, Key: "bar"})
+		if cmd == nil {
+			t.Fatal("expected LoadKeyPreview cmd")
+		}
+		msg := cmd()
+		loaded, ok := msg.(types.KeyPreviewLoadedMsg)
+		if !ok {
+			t.Fatalf("expected KeyPreviewLoadedMsg, got %T", msg)
+		}
+		if loaded.Key != "bar" {
+			t.Errorf("expected key bar, got %q", loaded.Key)
+		}
+	})
+	t.Run("seq mismatch ignored", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.Keys = []types.RedisKey{{Key: "foo"}}
+		m.SelectedKeyIdx = 0
+		m.PreviewSeq = 5
+		_, cmd := m.Update(types.PreviewDebounceMsg{Seq: 3, Key: "foo"})
+		if cmd != nil {
+			t.Error("expected nil cmd")
+		}
+	})
+	t.Run("key mismatch ignored", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.Keys = []types.RedisKey{{Key: "foo"}}
+		m.SelectedKeyIdx = 0
+		m.PreviewSeq = 1
+		_, cmd := m.Update(types.PreviewDebounceMsg{Seq: 1, Key: "bar"})
+		if cmd != nil {
+			t.Error("expected nil cmd")
+		}
+	})
+	t.Run("empty keys ignored", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.PreviewSeq = 1
+		_, cmd := m.Update(types.PreviewDebounceMsg{Seq: 1, Key: "foo"})
+		if cmd != nil {
+			t.Error("expected nil cmd")
+		}
+	})
+}
+
 func TestUpdate_TickMsg(t *testing.T) {
 	m, _, _ := newTestModel(t)
 	_, cmd := m.Update(types.TickMsg{})
@@ -91,6 +140,7 @@ func TestUpdate_AllMessageDispatchBranches(t *testing.T) {
 		types.KeysLoadedMsg{},
 		types.KeyValueLoadedMsg{},
 		types.KeyPreviewLoadedMsg{},
+		types.PreviewDebounceMsg{},
 		types.KeyDeletedMsg{},
 		types.KeySetMsg{},
 		types.KeyRenamedMsg{},

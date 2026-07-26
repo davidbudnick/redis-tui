@@ -16,6 +16,24 @@ func seedKeys(m *Model, n int) {
 	}
 }
 
+func assertPreviewDebounce(t *testing.T, cmd tea.Cmd, wantSeq int, wantKey string) {
+	t.Helper()
+	if cmd == nil {
+		t.Fatal("expected debounce cmd")
+	}
+	msg := cmd()
+	deb, ok := msg.(types.PreviewDebounceMsg)
+	if !ok {
+		t.Fatalf("expected PreviewDebounceMsg, got %T", msg)
+	}
+	if deb.Seq != wantSeq {
+		t.Errorf("expected Seq %d, got %d", wantSeq, deb.Seq)
+	}
+	if deb.Key != wantKey {
+		t.Errorf("expected Key %q, got %q", wantKey, deb.Key)
+	}
+}
+
 func TestHandleKeysScreen_Navigation(t *testing.T) {
 	t.Run("down advances", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
@@ -25,18 +43,22 @@ func TestHandleKeysScreen_Navigation(t *testing.T) {
 		if model.SelectedKeyIdx != 1 {
 			t.Errorf("expected 1, got %d", model.SelectedKeyIdx)
 		}
-		if cmd == nil {
-			t.Error("expected preview cmd")
+		if model.PreviewSeq != 1 {
+			t.Errorf("expected PreviewSeq 1, got %d", model.PreviewSeq)
 		}
+		assertPreviewDebounce(t, cmd, 1, "b")
 	})
 	t.Run("down at bottom", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		seedKeys(&m, 3)
 		m.SelectedKeyIdx = 2
-		result, _ := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyDown})
+		result, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyDown})
 		model := result.(Model)
 		if model.SelectedKeyIdx != 2 {
 			t.Errorf("expected 2, got %d", model.SelectedKeyIdx)
+		}
+		if cmd != nil {
+			t.Error("expected nil cmd when selection unchanged")
 		}
 	})
 	t.Run("up decrements", func(t *testing.T) {
@@ -48,52 +70,61 @@ func TestHandleKeysScreen_Navigation(t *testing.T) {
 		if model.SelectedKeyIdx != 1 {
 			t.Errorf("expected 1, got %d", model.SelectedKeyIdx)
 		}
-		if cmd == nil {
-			t.Error("expected preview cmd")
-		}
+		assertPreviewDebounce(t, cmd, 1, "b")
 	})
 	t.Run("up at top", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		seedKeys(&m, 3)
-		_, _ = m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyUp})
+		result, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyUp})
+		model := result.(Model)
+		if model.SelectedKeyIdx != 0 {
+			t.Errorf("expected 0, got %d", model.SelectedKeyIdx)
+		}
+		if cmd != nil {
+			t.Error("expected nil cmd when selection unchanged")
+		}
 	})
 	t.Run("pgup", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		seedKeys(&m, 20)
 		m.SelectedKeyIdx = 15
-		result, _ := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyPgUp})
+		result, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyPgUp})
 		model := result.(Model)
 		if model.SelectedKeyIdx != 5 {
 			t.Errorf("expected 5, got %d", model.SelectedKeyIdx)
 		}
+		assertPreviewDebounce(t, cmd, 1, string(rune('a'+5)))
 	})
 	t.Run("pgup clamps at 0", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		seedKeys(&m, 5)
 		m.SelectedKeyIdx = 3
-		result, _ := m.handleKeysScreen(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
+		result, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 		model := result.(Model)
 		if model.SelectedKeyIdx != 0 {
 			t.Errorf("expected 0, got %d", model.SelectedKeyIdx)
 		}
+		assertPreviewDebounce(t, cmd, 1, "a")
 	})
 	t.Run("pgdown", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		seedKeys(&m, 20)
-		result, _ := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyPgDown})
+		result, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyPgDown})
 		model := result.(Model)
 		if model.SelectedKeyIdx != 10 {
 			t.Errorf("expected 10, got %d", model.SelectedKeyIdx)
 		}
+		assertPreviewDebounce(t, cmd, 1, string(rune('a'+10)))
 	})
 	t.Run("pgdown clamps", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		seedKeys(&m, 5)
-		result, _ := m.handleKeysScreen(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
+		result, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl})
 		model := result.(Model)
 		if model.SelectedKeyIdx != 4 {
 			t.Errorf("expected 4, got %d", model.SelectedKeyIdx)
 		}
+		assertPreviewDebounce(t, cmd, 1, "e")
 	})
 	t.Run("pgdown empty", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
@@ -106,17 +137,23 @@ func TestHandleKeysScreen_Navigation(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		seedKeys(&m, 5)
 		m.SelectedKeyIdx = 3
-		result, _ := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyHome})
+		result, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyHome})
 		model := result.(Model)
 		if model.SelectedKeyIdx != 0 {
 			t.Errorf("expected 0, got %d", model.SelectedKeyIdx)
 		}
+		assertPreviewDebounce(t, cmd, 1, "a")
 	})
 	t.Run("g home", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		seedKeys(&m, 5)
 		m.SelectedKeyIdx = 3
-		_, _ = m.handleKeysScreen(keyMsg('g'))
+		result, cmd := m.handleKeysScreen(keyMsg('g'))
+		model := result.(Model)
+		if model.SelectedKeyIdx != 0 {
+			t.Errorf("expected 0, got %d", model.SelectedKeyIdx)
+		}
+		assertPreviewDebounce(t, cmd, 1, "a")
 	})
 	t.Run("home empty no-cmd", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
@@ -128,22 +165,68 @@ func TestHandleKeysScreen_Navigation(t *testing.T) {
 	t.Run("end", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		seedKeys(&m, 5)
-		result, _ := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyEnd})
+		result, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyEnd})
 		model := result.(Model)
 		if model.SelectedKeyIdx != 4 {
 			t.Errorf("expected 4, got %d", model.SelectedKeyIdx)
 		}
+		assertPreviewDebounce(t, cmd, 1, "e")
 	})
 	t.Run("G end", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		seedKeys(&m, 5)
-		_, _ = m.handleKeysScreen(keyMsg('G'))
+		result, cmd := m.handleKeysScreen(keyMsg('G'))
+		model := result.(Model)
+		if model.SelectedKeyIdx != 4 {
+			t.Errorf("expected 4, got %d", model.SelectedKeyIdx)
+		}
+		assertPreviewDebounce(t, cmd, 1, "e")
 	})
 	t.Run("end empty", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		_, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyEnd})
 		if cmd != nil {
 			t.Error("expected nil cmd")
+		}
+	})
+	t.Run("rapid j increments PreviewSeq and only latest seq matters", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		seedKeys(&m, 5)
+		result, cmd1 := m.handleKeysScreen(keyMsg('j'))
+		m = result.(Model)
+		result, cmd2 := m.handleKeysScreen(keyMsg('j'))
+		m = result.(Model)
+		if m.PreviewSeq != 2 {
+			t.Errorf("expected PreviewSeq 2, got %d", m.PreviewSeq)
+		}
+		assertPreviewDebounce(t, cmd1, 1, "b")
+		assertPreviewDebounce(t, cmd2, 2, "c")
+	})
+}
+
+func TestDebounceKeyPreview(t *testing.T) {
+	t.Run("empty keys returns nil", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		if cmd := m.debounceKeyPreview(); cmd != nil {
+			t.Error("expected nil cmd")
+		}
+	})
+	t.Run("out of range returns nil", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		seedKeys(&m, 2)
+		m.SelectedKeyIdx = 5
+		if cmd := m.debounceKeyPreview(); cmd != nil {
+			t.Error("expected nil cmd")
+		}
+	})
+	t.Run("schedules debounce with key", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		seedKeys(&m, 2)
+		m.SelectedKeyIdx = 1
+		cmd := m.debounceKeyPreview()
+		assertPreviewDebounce(t, cmd, 1, "b")
+		if m.PreviewSeq != 1 {
+			t.Errorf("expected PreviewSeq 1, got %d", m.PreviewSeq)
 		}
 	})
 }

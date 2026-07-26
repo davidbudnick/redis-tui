@@ -115,13 +115,39 @@ func TestHandleKeyPreviewLoadedMsg(t *testing.T) {
 			t.Errorf("expected type updated, got %v", model.Keys[0].Type)
 		}
 	})
-	t.Run("error ignored", func(t *testing.T) {
+	t.Run("error sets status for selected key", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		msg := types.KeyPreviewLoadedMsg{Err: errors.New("boom")}
+		m.Keys = []types.RedisKey{{Key: "foo"}}
+		m.SelectedKeyIdx = 0
+		m.PreviewKey = "foo"
+		m.PreviewValue = types.RedisValue{StringValue: "stale"}
+		m.PreviewRendered = "stale"
+		msg := types.KeyPreviewLoadedMsg{Key: "foo", Err: errors.New("boom")}
 		result, _ := m.handleKeyPreviewLoadedMsg(msg)
 		model := result.(Model)
+		if !strings.HasPrefix(model.StatusMsg, "Error:") {
+			t.Errorf("expected error status, got %q", model.StatusMsg)
+		}
 		if model.PreviewKey != "" {
-			t.Errorf("expected empty preview, got %q", model.PreviewKey)
+			t.Errorf("expected cleared PreviewKey, got %q", model.PreviewKey)
+		}
+		if model.PreviewRendered != "" {
+			t.Errorf("expected cleared PreviewRendered, got %q", model.PreviewRendered)
+		}
+	})
+	t.Run("error ignored for unselected key", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.Keys = []types.RedisKey{{Key: "foo"}}
+		m.SelectedKeyIdx = 0
+		m.PreviewKey = "foo"
+		msg := types.KeyPreviewLoadedMsg{Key: "bar", Err: errors.New("boom")}
+		result, _ := m.handleKeyPreviewLoadedMsg(msg)
+		model := result.(Model)
+		if model.StatusMsg != "" {
+			t.Errorf("expected empty status, got %q", model.StatusMsg)
+		}
+		if model.PreviewKey != "foo" {
+			t.Errorf("expected preview retained, got %q", model.PreviewKey)
 		}
 	})
 	t.Run("key mismatch ignored", func(t *testing.T) {

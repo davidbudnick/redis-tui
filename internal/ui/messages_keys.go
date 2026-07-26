@@ -55,13 +55,18 @@ func (m Model) handleKeyValueLoadedMsg(msg types.KeyValueLoadedMsg) (tea.Model, 
 
 func (m Model) handleKeyPreviewLoadedMsg(msg types.KeyPreviewLoadedMsg) (tea.Model, tea.Cmd) {
 	if msg.Err != nil {
+		slog.Error("Failed to load key preview", "key", msg.Key, "error", msg.Err)
+		if len(m.Keys) > 0 && m.SelectedKeyIdx < len(m.Keys) && m.Keys[m.SelectedKeyIdx].Key == msg.Key {
+			m.StatusMsg = "Error: " + msg.Err.Error()
+			m.PreviewKey = ""
+			m.PreviewValue = types.RedisValue{}
+			m.PreviewRendered = ""
+		}
 		return m, nil
 	}
-	// Only update if the key matches the currently selected key
 	if len(m.Keys) > 0 && m.SelectedKeyIdx < len(m.Keys) && m.Keys[m.SelectedKeyIdx].Key == msg.Key {
 		m.PreviewKey = msg.Key
 		m.PreviewValue = msg.Value
-		// Pre-format string/JSON/protobuf previews once — must not run per frame.
 		m.PreviewRendered = ""
 		switch msg.Value.Type {
 		case types.KeyTypeString:
@@ -71,8 +76,6 @@ func (m Model) handleKeyPreviewLoadedMsg(msg types.KeyPreviewLoadedMsg) (tea.Mod
 		case types.KeyTypeProtobuf:
 			m.PreviewRendered = formatProtobufValue(msg.Value)
 		}
-		// On-demand type resolution: fill in type if it was not fetched during scan,
-		// or update when GetValue detected a subtype (e.g. string→hyperloglog)
 		if msg.Value.Type != "" && m.Keys[m.SelectedKeyIdx].Type != msg.Value.Type {
 			m.Keys[m.SelectedKeyIdx].Type = msg.Value.Type
 		}

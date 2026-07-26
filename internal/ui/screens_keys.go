@@ -17,6 +17,18 @@ func createVimEditor(content string, width, height int, fileName string) *editor
 	return editor.New(content, width, height, fileName)
 }
 
+func (m *Model) debounceKeyPreview() tea.Cmd {
+	if len(m.Keys) == 0 || m.SelectedKeyIdx < 0 || m.SelectedKeyIdx >= len(m.Keys) {
+		return nil
+	}
+	m.PreviewSeq++
+	seq := m.PreviewSeq
+	key := m.Keys[m.SelectedKeyIdx].Key
+	return tea.Tick(100*time.Millisecond, func(time.Time) tea.Msg {
+		return types.PreviewDebounceMsg{Seq: seq, Key: key}
+	})
+}
+
 func (m Model) handleKeysScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.Inputs.PatternInput.Focused() {
 		switch msg.String() {
@@ -54,25 +66,19 @@ func (m Model) handleKeysScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "up", "k":
 		if m.SelectedKeyIdx > 0 {
 			m.SelectedKeyIdx--
-			if len(m.Keys) > 0 && m.SelectedKeyIdx < len(m.Keys) {
-				return m, m.Cmds.LoadKeyPreview(m.Keys[m.SelectedKeyIdx].Key)
-			}
+			return m, m.debounceKeyPreview()
 		}
 	case "down", "j":
 		if len(m.Keys) > 0 && m.SelectedKeyIdx < len(m.Keys)-1 {
 			m.SelectedKeyIdx++
-			if len(m.Keys) > 0 && m.SelectedKeyIdx < len(m.Keys) {
-				return m, m.Cmds.LoadKeyPreview(m.Keys[m.SelectedKeyIdx].Key)
-			}
+			return m, m.debounceKeyPreview()
 		}
 	case "pgup", "ctrl+u":
 		m.SelectedKeyIdx -= 10
 		if m.SelectedKeyIdx < 0 {
 			m.SelectedKeyIdx = 0
 		}
-		if len(m.Keys) > 0 && m.SelectedKeyIdx < len(m.Keys) {
-			return m, m.Cmds.LoadKeyPreview(m.Keys[m.SelectedKeyIdx].Key)
-		}
+		return m, m.debounceKeyPreview()
 	case "pgdown", "ctrl+d":
 		if len(m.Keys) == 0 {
 			return m, nil
@@ -81,18 +87,14 @@ func (m Model) handleKeysScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.SelectedKeyIdx >= len(m.Keys) {
 			m.SelectedKeyIdx = len(m.Keys) - 1
 		}
-		if len(m.Keys) > 0 && m.SelectedKeyIdx < len(m.Keys) {
-			return m, m.Cmds.LoadKeyPreview(m.Keys[m.SelectedKeyIdx].Key)
-		}
+		return m, m.debounceKeyPreview()
 	case "home", "g":
 		m.SelectedKeyIdx = 0
-		if len(m.Keys) > 0 {
-			return m, m.Cmds.LoadKeyPreview(m.Keys[m.SelectedKeyIdx].Key)
-		}
+		return m, m.debounceKeyPreview()
 	case "end", "G":
 		if len(m.Keys) > 0 {
 			m.SelectedKeyIdx = len(m.Keys) - 1
-			return m, m.Cmds.LoadKeyPreview(m.Keys[m.SelectedKeyIdx].Key)
+			return m, m.debounceKeyPreview()
 		}
 	case "enter":
 		if len(m.Keys) > 0 && m.SelectedKeyIdx < len(m.Keys) {
