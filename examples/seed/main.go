@@ -13,7 +13,9 @@ import (
 	"net"
 	"time"
 
+	"github.com/klauspost/compress/s2"
 	"github.com/redis/go-redis/v9"
+	"google.golang.org/protobuf/encoding/protowire"
 )
 
 func main() {
@@ -76,6 +78,7 @@ func runSeeds(ctx context.Context, rdb redis.Cmdable) {
 	seedTTLKeys(ctx, rdb)
 	seedNestedKeys(ctx, rdb)
 	seedJSONStrings(ctx, rdb)
+	seedProtobuf(ctx, rdb)
 	if checkJSON(ctx, rdb) {
 		seedJSON(ctx, rdb)
 	} else {
@@ -324,6 +327,71 @@ func seedJSONStrings(ctx context.Context, rdb redis.Cmdable) {
 		must(rdb.Set(ctx, k, v, 0))
 	}
 	fmt.Printf("  json strings: %d keys\n", len(jsons))
+}
+
+func seedProtobuf(ctx context.Context, rdb redis.Cmdable) {
+	user := protoJoin(
+		protoString(1, "Alice Johnson"),
+		protoString(2, "alice@example.com"),
+		protoVarint(3, 1001),
+		protoNested(4, protoJoin(protoString(1, "dark"), protoString(2, "en"))),
+	)
+	must(rdb.Set(ctx, "pb:user-profile", user, 0))
+
+	delivery := protoJoin(
+		protoString(1, "rst-demo:DELIVERY"),
+		protoString(3, "America/Toronto"),
+		protoVarint(5, 42),
+	)
+	must(rdb.Set(ctx, "pb:delivery", delivery, 0))
+
+	menu := protoJoin(
+		protoString(1, "menu-id"),
+		protoNested(4, protoJoin(
+			protoString(1, "cat-1"),
+			protoNested(2, protoJoin(protoString(1, "item-1"), protoString(2, "Margherita"))),
+		)),
+	)
+	must(rdb.Set(ctx, "pb:s2:menu", s2.Encode(nil, menu), 0))
+
+	session := protoJoin(
+		protoString(1, "sess-abc123"),
+		protoVarint(2, 1001),
+		protoString(3, "192.168.1.42"),
+		protoNested(4, protoJoin(protoString(1, "web"), protoVarint(2, 1))),
+	)
+	must(rdb.Set(ctx, "pb:s2:session", s2.Encode(nil, session), 0))
+
+	fmt.Println("  protobuf:     4 keys (2 raw, 2 s2+protobuf)")
+}
+
+func protoJoin(parts ...[]byte) []byte {
+	var out []byte
+	for _, p := range parts {
+		out = append(out, p...)
+	}
+	return out
+}
+
+func protoString(num protowire.Number, s string) []byte {
+	var b []byte
+	b = protowire.AppendTag(b, num, protowire.BytesType)
+	b = protowire.AppendString(b, s)
+	return b
+}
+
+func protoVarint(num protowire.Number, v uint64) []byte {
+	var b []byte
+	b = protowire.AppendTag(b, num, protowire.VarintType)
+	b = protowire.AppendVarint(b, v)
+	return b
+}
+
+func protoNested(num protowire.Number, inner []byte) []byte {
+	var b []byte
+	b = protowire.AppendTag(b, num, protowire.BytesType)
+	b = protowire.AppendBytes(b, inner)
+	return b
 }
 
 func hasJSONModule(ctx context.Context, rdb redis.Cmdable) bool {

@@ -5,10 +5,12 @@ import (
 	"flag"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/alicebob/miniredis/v2/server"
+	"github.com/davidbudnick/redis-tui/internal/decode"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -146,6 +148,38 @@ func TestSeedJSONStrings(t *testing.T) {
 	seedJSONStrings(context.Background(), rdb)
 	if !mr.Exists("json:user-profile") {
 		t.Error("json:user-profile should exist")
+	}
+}
+
+func TestSeedProtobuf(t *testing.T) {
+	mr, rdb := setupMiniRedis(t)
+	seedProtobuf(context.Background(), rdb)
+
+	for _, key := range []string{"pb:user-profile", "pb:delivery", "pb:s2:menu", "pb:s2:session"} {
+		if !mr.Exists(key) {
+			t.Errorf("%s should exist", key)
+		}
+	}
+
+	raw, err := mr.Get("pb:delivery")
+	if err != nil {
+		t.Fatalf("get pb:delivery: %v", err)
+	}
+	got, ok := decode.TryBinary([]byte(raw))
+	if !ok || got.Format != "protobuf" {
+		t.Fatalf("pb:delivery format = %q ok=%v, want protobuf", got.Format, ok)
+	}
+
+	compressed, err := mr.Get("pb:s2:menu")
+	if err != nil {
+		t.Fatalf("get pb:s2:menu: %v", err)
+	}
+	got, ok = decode.TryBinary([]byte(compressed))
+	if !ok || got.Format != "s2+protobuf" {
+		t.Fatalf("pb:s2:menu format = %q ok=%v, want s2+protobuf", got.Format, ok)
+	}
+	if !strings.Contains(got.Text, "menu-id") {
+		t.Errorf("decoded menu missing menu-id:\n%s", got.Text)
 	}
 }
 

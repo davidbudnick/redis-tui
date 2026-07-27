@@ -7,7 +7,7 @@ DATE := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 LDFLAGS := -ldflags "-X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)"
 
 .PHONY: all build install clean test bench test-cover test-cover-check lint run start release snapshot demo \
-	docker-up docker-down docker-seed \
+	docker-up docker-down docker-seed docker-up-all docker-down-all docker-seed-all \
 	docker-up-standalone docker-up-standalone-stack docker-up-cluster docker-up-cluster-stack \
 	docker-down-standalone docker-down-standalone-stack docker-down-cluster docker-down-cluster-stack \
 	docker-seed-standalone docker-seed-standalone-stack docker-seed-cluster docker-seed-cluster-stack
@@ -110,14 +110,19 @@ dev-deps:
 
 ## --- Docker Examples ---
 
-## Start all example Redis instances
-docker-up: docker-up-standalone docker-up-standalone-stack docker-up-cluster docker-up-cluster-stack
+## Start default example Redis instances (plain redis only — no redis-stack)
+docker-up: docker-up-standalone docker-up-cluster
 
-## Stop all example Redis instances
-docker-down: docker-down-standalone docker-down-standalone-stack docker-down-cluster docker-down-cluster-stack
+## Stop default example Redis instances
+docker-down: docker-down-standalone docker-down-cluster
 
-## Seed all running example instances
-docker-seed: docker-seed-standalone docker-seed-standalone-stack docker-seed-cluster docker-seed-cluster-stack
+## Seed default example instances
+docker-seed: docker-seed-standalone docker-seed-cluster
+
+## Start / stop / seed every compose file including redis-stack
+docker-up-all: docker-up-standalone docker-up-standalone-stack docker-up-cluster docker-up-cluster-stack
+docker-down-all: docker-down-standalone docker-down-standalone-stack docker-down-cluster docker-down-cluster-stack
+docker-seed-all: docker-seed-standalone docker-seed-standalone-stack docker-seed-cluster docker-seed-cluster-stack
 
 ## Standalone (redis:7-alpine on :6379)
 docker-up-standalone:
@@ -188,9 +193,12 @@ help:
 	@echo "    dev-deps    - Install development dependencies"
 	@echo ""
 	@echo "  Docker Examples:"
-	@echo "    docker-up                  - Start all instances"
-	@echo "    docker-down                - Stop all instances"
-	@echo "    docker-seed                - Seed all instances"
+	@echo "    docker-up                  - Start default instances (standalone + cluster)"
+	@echo "    docker-down                - Stop default instances"
+	@echo "    docker-seed                - Seed default instances"
+	@echo "    docker-up-all              - Start all instances including redis-stack"
+	@echo "    docker-down-all            - Stop all instances including redis-stack"
+	@echo "    docker-seed-all            - Seed all instances including redis-stack"
 	@echo "    docker-up-standalone       - Standalone (:6379)"
 	@echo "    docker-up-standalone-stack - Standalone Redis Stack (:6390)"
 	@echo "    docker-up-cluster          - Cluster (:6380-6385)"

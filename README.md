@@ -266,7 +266,7 @@ docker compose -f examples/cluster-redis-stack/docker-compose.yml up -d
 redis-tui -h localhost -p 6386 --cluster
 ```
 
-The `Makefile` also exposes shortcuts for these (`make docker-up-standalone`, `make docker-up-cluster`, `make docker-up-standalone-stack`, `make docker-up-cluster-stack`) along with matching `docker-down-*` and `docker-seed-*` targets.
+`make docker-up` / `make docker-seed` start and seed the default plain Redis instances (standalone + cluster). Redis Stack is optional via `make docker-up-standalone-stack`, `make docker-up-cluster-stack`, or `make docker-up-all`.
 
 ## Configuration
 
