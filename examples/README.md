@@ -41,16 +41,17 @@ redis-tui -c localhost:6386
 ## Makefile Shortcuts
 
 ```sh
-make docker-up     # Start all four instances
-make docker-down   # Stop all four instances
-make docker-seed   # Seed all four instances
+make docker-up     # Start default instances (standalone + cluster, plain redis)
+make docker-down   # Stop default instances
+make docker-seed   # Seed default instances
+make docker-up-all # Also start redis-stack compose files
 ```
 
-Individual targets are also available (e.g. `make docker-up-standalone-stack`). Run `make help` for the full list.
+Redis Stack remains optional via `make docker-up-standalone-stack` / `make docker-up-cluster-stack` (or `make docker-up-all`). Run `make help` for the full list.
 
 ## Seed Data
 
-Populate an instance with sample data covering every data type. Native RedisJSON keys are seeded automatically when the module is available (Redis Stack), otherwise they are skipped gracefully.
+Populate an instance with sample data covering every data type — including raw protobuf and s2-compressed protobuf strings for the TUI decoder. Native RedisJSON keys are seeded automatically when the module is available (Redis Stack), otherwise they are skipped gracefully.
 
 ```sh
 # Standalone (localhost:6379)
