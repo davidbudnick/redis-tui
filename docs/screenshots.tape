@@ -1,6 +1,4 @@
-# Redis TUI Demo — key browser, previews, protobuf, and detail
-Output "docs/main.gif"
-
+# Static README screenshots — key browser, protobuf decode, key detail
 Require ./bin/redis-tui
 
 Set Shell "zsh"
@@ -9,14 +7,13 @@ Set FontFamily "FiraCode Nerd Font Mono"
 Set Theme "Dracula"
 Set Width 1600
 Set Height 960
-Set TypingSpeed 0.04s
+Set TypingSpeed 0.03s
 Set Padding 16
 
-# Seed-aware demo config (standalone + cluster)
 Hide
 Type "export DEMO_HOME=$(mktemp -d) && mkdir -p $DEMO_HOME/.config/redis-tui && cp docs/demo-config.json $DEMO_HOME/.config/redis-tui/config.json"
 Enter
-Sleep 0.5s
+Sleep 0.4s
 # Force color: agent shells often export NO_COLOR=1 / TERM=dumb
 Type "unset NO_COLOR FORCE_COLOR CLICOLOR; export COLORTERM=truecolor TERM=xterm-256color CLICOLOR_FORCE=1 FORCE_COLOR=1"
 Enter
@@ -25,69 +22,50 @@ Type "HOME=$DEMO_HOME ./bin/redis-tui"
 Enter
 Sleep 1.5s
 Show
-Sleep 2s
+Sleep 1s
 
 # Connect to standalone
 Enter
 Sleep 2.5s
 
-# Browse with hash preview
+# --- Key browser: full list with mixed types ---
+Sleep 1s
+Screenshot docs/main.png
+
+# --- Key browser: hash preview (filtered) ---
 Type "/"
-Sleep 0.3s
+Sleep 0.2s
 Type "user:"
-Sleep 0.4s
+Sleep 0.3s
 Enter
-Sleep 2s
+Sleep 1.8s
 Down
 Sleep 0.8s
-Down
-Sleep 1.2s
+Screenshot docs/keys-preview.png
 
-# Open hash detail
-Enter
-Sleep 2.5s
-Escape
-Sleep 1s
-
-# Filter to s2-compressed protobuf
+# --- Key browser: s2+protobuf preview ---
 Type "/"
-Sleep 0.3s
-Backspace 10
+Sleep 0.2s
+Backspace 20
 Type "pb:s2"
-Sleep 0.4s
-Enter
-Sleep 2s
-Down
-Sleep 1.2s
-
-# Open protobuf detail (decoded view)
-Enter
-Sleep 3s
-Escape
-Sleep 1s
-
-# JSON string preview + detail
-Type "/"
 Sleep 0.3s
-Backspace 10
-Type "json:"
-Sleep 0.4s
 Enter
 Sleep 2s
-Enter
-Sleep 2.5s
-Escape
-Sleep 1s
+Screenshot docs/protobuf.png
 
-# Clear filter and show full key list
+# --- Key detail: JSON value ---
 Type "/"
+Sleep 0.2s
+Backspace 20
+Type "json:user"
 Sleep 0.3s
-Backspace 10
+Enter
+Sleep 1.5s
 Enter
 Sleep 2s
+Screenshot docs/detail.png
 
-# Tree view for hierarchical keys
-Type "T"
-Sleep 3s
 Escape
-Sleep 1s
+Sleep 0.5s
+Escape
+Sleep 0.3s

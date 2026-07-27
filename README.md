@@ -27,13 +27,29 @@ go install github.com/davidbudnick/redis-tui@latest
 
 ## Screenshots
 
-### Key Browser with Preview
+### Key Browser
 
-![Main](docs/main.png)
+Browse the keyspace with type and TTL columns. Selecting a key loads a **bounded live preview** so huge values never block Redis.
 
-### Live Metrics Dashboard
+![Key browser](docs/main.png)
 
-![Metrics](docs/metrics.png)
+### Live Preview Panel
+
+Hashes, lists, JSON strings, and other types render in the side panel as you move with `j`/`k`.
+
+![Key preview](docs/keys-preview.png)
+
+### Protobuf & s2 Decoding
+
+Raw protobuf and **s2-compressed** protobuf binary strings are detected and pretty-printed schema-less in preview and detail.
+
+![Protobuf s2 preview](docs/protobuf.png)
+
+### Key Detail
+
+Open any key for syntax-highlighted JSON, decoded protobuf, collection members, and edit/delete actions.
+
+![Key detail](docs/detail.png)
 
 ## Features
 

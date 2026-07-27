@@ -6,7 +6,7 @@ COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 LDFLAGS := -ldflags "-X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)"
 
-.PHONY: all build install clean test bench test-cover test-cover-check lint run start release snapshot demo \
+.PHONY: all build install clean test bench test-cover test-cover-check lint run start release snapshot demo screenshots \
 	docker-up docker-down docker-seed docker-up-all docker-down-all docker-seed-all \
 	docker-up-standalone docker-up-standalone-stack docker-up-cluster docker-up-cluster-stack \
 	docker-down-standalone docker-down-standalone-stack docker-down-cluster docker-down-cluster-stack \
@@ -168,9 +168,15 @@ docker-seed-cluster-stack:
 
 ## Render the README demo GIF against an isolated demo config.
 ## Built without $(LDFLAGS) so main.version stays "dev" and the update banner is suppressed.
+## Unset NO_COLOR so lipgloss emits ANSI colors under VHS (agent shells often set NO_COLOR=1).
 demo: docker-up-standalone docker-up-cluster docker-seed-standalone docker-seed-cluster
 	go build -o bin/$(APP_NAME) ./
-	vhs docs/demo.tape
+	env -u NO_COLOR -u FORCE_COLOR COLORTERM=truecolor TERM=xterm-256color CLICOLOR_FORCE=1 FORCE_COLOR=1 vhs docs/demo.tape
+
+## Capture static README screenshots (docs/main.png, keys-preview.png, protobuf.png, detail.png).
+screenshots: docker-up-standalone docker-seed-standalone
+	go build -o bin/$(APP_NAME) ./
+	env -u NO_COLOR -u FORCE_COLOR COLORTERM=truecolor TERM=xterm-256color CLICOLOR_FORCE=1 FORCE_COLOR=1 vhs docs/screenshots.tape
 
 ## Show help
 help:
@@ -206,5 +212,6 @@ help:
 	@echo ""
 	@echo "  Demo:"
 	@echo "    demo        - Render the README demo GIF"
+	@echo "    screenshots - Capture README static screenshots"
 	@echo ""
 	@echo "    help        - Show this help"
