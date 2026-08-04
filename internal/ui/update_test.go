@@ -377,6 +377,56 @@ func TestHandleKeyPress_GlobalKeys(t *testing.T) {
 			t.Error("expected screen unchanged")
 		}
 	})
+	t.Run("q typed into key filter does not quit", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.Screen = types.ScreenKeys
+		m.Inputs.PatternInput.Focus()
+		m.Inputs.PatternInput.SetValue("sideki")
+		result, _ := m.handleKeyPress(keyMsg('q'))
+		if got := result.(Model).Inputs.PatternInput.Value(); got != "sidekiq" {
+			t.Errorf("expected sidekiq in filter, got %q", got)
+		}
+	})
+	t.Run("? typed into key filter does not open help", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.Screen = types.ScreenKeys
+		m.Inputs.PatternInput.Focus()
+		result, _ := m.handleKeyPress(keyMsg('?'))
+		updated := result.(Model)
+		if updated.Screen != types.ScreenKeys {
+			t.Errorf("expected ScreenKeys, got %v", updated.Screen)
+		}
+		if got := updated.Inputs.PatternInput.Value(); got != "?" {
+			t.Errorf("expected ? in filter, got %q", got)
+		}
+	})
+}
+
+func TestTextEntryActive(t *testing.T) {
+	t.Run("vim editor active", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.Screen = types.ScreenEditValue
+		m.VimEditor = createVimEditor("value", 80, 24, "key")
+		if !m.textEntryActive() {
+			t.Error("expected text entry active with vim editor")
+		}
+	})
+	t.Run("focused input active", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.Screen = types.ScreenKeys
+		m.Inputs.PatternInput.Focus()
+		if !m.textEntryActive() {
+			t.Error("expected text entry active with focused filter")
+		}
+	})
+	t.Run("no input inactive", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.Screen = types.ScreenKeys
+		m.Inputs.PatternInput.Blur()
+		if m.textEntryActive() {
+			t.Error("expected text entry inactive")
+		}
+	})
 }
 
 func TestHandleKeyPress_AllScreens(t *testing.T) {

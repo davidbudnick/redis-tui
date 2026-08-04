@@ -5,6 +5,17 @@ import (
 	"github.com/davidbudnick/redis-tui/internal/types"
 )
 
+// textEntryActive reports whether the current screen is capturing free-form
+// text, in which case single-letter global shortcuts (q, ?) must not fire —
+// otherwise typing a filter like "sidekiq" quits the app.
+func (m Model) textEntryActive() bool {
+	if m.Screen == types.ScreenEditValue && m.VimEditor != nil {
+		return true
+	}
+	_, focused := m.focusedInputValue()
+	return focused
+}
+
 // focusedInputValue returns the text of the focused input on the current screen.
 func (m Model) focusedInputValue() (string, bool) {
 	switch m.Screen {
