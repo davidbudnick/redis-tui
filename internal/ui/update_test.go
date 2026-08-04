@@ -400,6 +400,15 @@ func TestHandleKeyPress_GlobalKeys(t *testing.T) {
 			t.Errorf("expected ? in filter, got %q", got)
 		}
 	})
+	t.Run("? typed into vim editor does not open help", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.Screen = types.ScreenEditValue
+		m.VimEditor = createVimEditor("value", 80, 24, "key")
+		result, _ := m.handleKeyPress(keyMsg('?'))
+		if result.(Model).Screen != types.ScreenEditValue {
+			t.Errorf("expected ScreenEditValue, got %v", result.(Model).Screen)
+		}
+	})
 }
 
 func TestTextEntryActive(t *testing.T) {
