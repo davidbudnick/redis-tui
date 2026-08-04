@@ -277,6 +277,9 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, m.Cmds.CopyToClipboard(value)
 		}
 	case "q":
+		if m.textEntryActive() {
+			break
+		}
 		if m.Screen == types.ScreenConnections {
 			return m, tea.Quit
 		}
@@ -284,6 +287,9 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 	case "?":
+		if m.textEntryActive() {
+			break
+		}
 		if m.Screen != types.ScreenHelp && m.Screen != types.ScreenAddConnection &&
 			m.Screen != types.ScreenEditConnection && m.Screen != types.ScreenAddKey &&
 			m.Screen != types.ScreenTTLEditor {
