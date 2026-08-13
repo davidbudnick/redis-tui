@@ -235,9 +235,13 @@ func TestHandleKeysScreen_Actions(t *testing.T) {
 	t.Run("enter opens detail", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		seedKeys(&m, 3)
-		_, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
+		m.StatusMsg = "Connected"
+		result, cmd := m.handleKeysScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Error("expected load value cmd")
+		}
+		if result.(Model).StatusMsg != "" {
+			t.Errorf("StatusMsg = %q, want empty after inspect", result.(Model).StatusMsg)
 		}
 	})
 	t.Run("enter empty", func(t *testing.T) {

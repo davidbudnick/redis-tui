@@ -154,6 +154,11 @@ type TickMsg struct{}
 
 type WatchTickMsg struct{}
 
+// StatusClearMsg dismisses a transient status bar toast after its timer fires.
+type StatusClearMsg struct {
+	ID int
+}
+
 type SearchDebounceMsg struct {
 	Seq int
 }

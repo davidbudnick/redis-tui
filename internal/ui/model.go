@@ -40,6 +40,7 @@ type Model struct {
 	Height            int
 	Err               error
 	StatusMsg         string
+	statusID          int
 	Loading           bool
 	ConfirmType       string
 	ConfirmData       any
