@@ -101,6 +101,7 @@ func (m Model) handleKeysScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			key := m.Keys[m.SelectedKeyIdx]
 			m.CurrentKey = &key
 			m.Loading = true
+			m.StatusMsg = ""
 			m.SelectedItemIdx = 0
 			return m, tea.Batch(m.Cmds.LoadKeyValue(key.Key), m.Cmds.GetMemoryUsage(key.Key))
 		}

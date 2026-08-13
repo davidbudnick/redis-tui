@@ -10,6 +10,16 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if clear, ok := msg.(types.StatusClearMsg); ok {
+		return m.handleStatusClear(clear)
+	}
+	prevStatus := m.StatusMsg
+	model, cmd := m.dispatch(msg)
+	updated := model.(Model)
+	return updated, tea.Batch(cmd, updated.scheduleStatusClear(prevStatus))
+}
+
+func (m Model) dispatch(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
