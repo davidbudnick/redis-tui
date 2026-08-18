@@ -6,15 +6,17 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"time"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
+	"syscall"
+	"time"
 )
 
 var githubAPIBase = "https://api.github.com"
@@ -29,6 +31,7 @@ var (
 	ioCopy        = io.Copy
 	osOpenFile    = os.OpenFile
 	osCreateTemp  = os.CreateTemp
+	osRename      = os.Rename
 )
 
 const githubRepo = "davidbudnick/redis-tui"
@@ -294,7 +297,7 @@ func replaceBinary(currentPath, newPath string) error {
 		hasBackup = false
 	}
 
-	if err := os.Rename(newPath, currentPath); err != nil {
+	if err := installBinary(newPath, currentPath); err != nil {
 		if hasBackup {
 			_ = os.Rename(oldPath, currentPath)
 		}
@@ -305,6 +308,43 @@ func replaceBinary(currentPath, newPath string) error {
 		_ = os.Remove(oldPath)
 	}
 	return nil
+}
+
+// installBinary moves src onto dest, copying when rename cannot cross devices.
+func installBinary(src, dest string) error {
+	if err := osRename(src, dest); err == nil {
+		return nil
+	} else if !isCrossDevice(err) {
+		return err
+	}
+	return copyFile(src, dest)
+}
+
+// isCrossDevice reports whether err is a cross-device rename failure.
+func isCrossDevice(err error) bool {
+	return errors.Is(err, syscall.EXDEV)
+}
+
+// copyFile copies src to dest with executable permissions.
+func copyFile(src, dest string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("could not open new binary: %w", err)
+	}
+	defer in.Close()
+
+	out, err := osOpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0700) // #nosec G302 - binary must be executable
+	if err != nil {
+		return fmt.Errorf("could not create destination: %w", err)
+	}
+
+	if _, err := ioCopy(out, in); err != nil {
+		_ = out.Close() // #nosec G104 - best-effort close on write error
+		_ = os.Remove(dest)
+		return fmt.Errorf("could not write destination: %w", err)
+	}
+
+	return out.Close()
 }
 
 func isSemver(s string) bool {
