@@ -336,7 +336,8 @@ func isCrossDevice(err error) bool {
 
 // copyFile copies src to dest with executable permissions.
 func copyFile(src, dest string) error {
-	in, err := os.Open(src)
+	cleanSrc := filepath.Clean(src)
+	in, err := os.Open(cleanSrc) // #nosec G304 - path constructed from os.MkdirTemp
 	if err != nil {
 		return fmt.Errorf("could not open new binary: %w", err)
 	}
