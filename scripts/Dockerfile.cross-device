@@ -1,0 +1,27 @@
+FROM ubuntu:26.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        gcc \
+        libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG GO_VERSION=1.26.6
+ARG TARGETARCH
+
+RUN arch="${TARGETARCH:-$(uname -m)}" \
+    && case "$arch" in \
+         x86_64) arch=amd64 ;; \
+         aarch64) arch=arm64 ;; \
+       esac \
+    && curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-${arch}.tar.gz" \
+    | tar -C /usr/local -xz
+
+ENV PATH=/usr/local/go/bin:$PATH \
+    GOTOOLCHAIN=local \
+    CGO_ENABLED=1
+
+WORKDIR /src
