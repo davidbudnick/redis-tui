@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -473,6 +474,136 @@ func TestReplaceBinary(t *testing.T) {
 		}
 		if string(data) != "old" {
 			t.Errorf("content = %q, want original restored", string(data))
+		}
+	})
+
+	t.Run("cross device copy", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		current := filepath.Join(tmpDir, "redis-tui")
+		newBin := filepath.Join(tmpDir, "redis-tui-new")
+
+		if err := os.WriteFile(current, []byte("old"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(newBin, []byte("new"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		origRename := osRename
+		osRename = func(oldpath, newpath string) error {
+			return &os.LinkError{Op: "rename", Old: oldpath, New: newpath, Err: syscall.EXDEV}
+		}
+		t.Cleanup(func() { osRename = origRename })
+
+		if err := replaceBinary(current, newBin); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		data, err := os.ReadFile(current)
+		if err != nil {
+			t.Fatalf("read failed: %v", err)
+		}
+		if string(data) != "new" {
+			t.Errorf("content = %q, want %q", string(data), "new")
+		}
+
+		info, err := os.Stat(current)
+		if err != nil {
+			t.Fatalf("stat failed: %v", err)
+		}
+		if info.Mode().Perm()&0o100 == 0 {
+			t.Errorf("mode = %v, want executable", info.Mode())
+		}
+	})
+
+	t.Run("cross device copy dest error restores backup", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		current := filepath.Join(tmpDir, "redis-tui")
+		newBin := filepath.Join(tmpDir, "redis-tui-new")
+
+		if err := os.WriteFile(current, []byte("old"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(newBin, []byte("new"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		origRename := osRename
+		osRename = func(oldpath, newpath string) error {
+			return &os.LinkError{Op: "rename", Old: oldpath, New: newpath, Err: syscall.EXDEV}
+		}
+		t.Cleanup(func() { osRename = origRename })
+
+		origOpen := osOpenFile
+		osOpenFile = func(string, int, os.FileMode) (*os.File, error) {
+			return nil, fmt.Errorf("no dest")
+		}
+		t.Cleanup(func() { osOpenFile = origOpen })
+
+		err := replaceBinary(current, newBin)
+		if err == nil {
+			t.Fatal("expected install error")
+		}
+
+		data, err := os.ReadFile(current)
+		if err != nil {
+			t.Fatalf("read failed: %v", err)
+		}
+		if string(data) != "old" {
+			t.Errorf("content = %q, want original restored", string(data))
+		}
+	})
+}
+
+func TestCopyFile(t *testing.T) {
+	t.Run("source missing", func(t *testing.T) {
+		dest := filepath.Join(t.TempDir(), "dest")
+		err := copyFile(filepath.Join(t.TempDir(), "missing"), dest)
+		if err == nil {
+			t.Fatal("expected error for missing source")
+		}
+		if !strings.Contains(err.Error(), "could not open new binary") {
+			t.Errorf("error = %q, want open error", err)
+		}
+	})
+
+	t.Run("destination unwritable", func(t *testing.T) {
+		src := filepath.Join(t.TempDir(), "src")
+		if err := os.WriteFile(src, []byte("bin"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		err := copyFile(src, filepath.Join("/nonexistent-dir-xyz", "dest"))
+		if err == nil {
+			t.Fatal("expected error for unwritable destination")
+		}
+		if !strings.Contains(err.Error(), "could not create destination") {
+			t.Errorf("error = %q, want create error", err)
+		}
+	})
+
+	t.Run("copy error", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		src := filepath.Join(tmpDir, "src")
+		dest := filepath.Join(tmpDir, "dest")
+		if err := os.WriteFile(src, []byte("bin"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		origCopy := ioCopy
+		ioCopy = func(io.Writer, io.Reader) (int64, error) {
+			return 0, fmt.Errorf("copy fail")
+		}
+		t.Cleanup(func() { ioCopy = origCopy })
+
+		err := copyFile(src, dest)
+		if err == nil {
+			t.Fatal("expected copy error")
+		}
+		if !strings.Contains(err.Error(), "could not write destination") {
+			t.Errorf("error = %q, want write error", err)
+		}
+		if _, err := os.Stat(dest); !os.IsNotExist(err) {
+			t.Error("expected partial destination to be removed")
 		}
 	})
 }
