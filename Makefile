@@ -6,7 +6,7 @@ COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 LDFLAGS := -ldflags "-X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)"
 
-.PHONY: all build install clean test bench test-cover test-cover-check lint run start release snapshot demo screenshots \
+.PHONY: all build install clean test bench test-cover test-cover-check test-cross-device lint run start release snapshot demo screenshots \
 	docker-up docker-down docker-seed docker-up-all docker-down-all docker-seed-all \
 	docker-up-standalone docker-up-standalone-stack docker-up-cluster docker-up-cluster-stack \
 	docker-down-standalone docker-down-standalone-stack docker-down-cluster docker-down-cluster-stack \
@@ -61,6 +61,19 @@ test-cover-check:
 			exit 1; \
 		fi; \
 		echo "All functions at 100% coverage"
+
+## Reproduce issue #71 on Ubuntu 26.04 (/tmp tmpfs vs dest disk) and verify the copy fallback.
+test-cross-device:
+	docker build --load -f scripts/Dockerfile.cross-device -t redis-tui-cross-device scripts/
+	docker run --rm \
+		--tmpfs /tmp:exec,mode=1777,size=512m \
+		-v "$(CURDIR)":/src \
+		-w /src \
+		-e CROSS_DEVICE_SRC=/tmp \
+		-e CROSS_DEVICE_DEST=/opt/dest \
+		-e REQUIRE_CROSS_DEVICE=1 \
+		redis-tui-cross-device \
+		sh scripts/test-cross-device-update.sh
 
 ## Run linter
 lint:
@@ -189,6 +202,7 @@ help:
 	@echo "    test        - Run tests"
 	@echo "    test-cover        - Run tests with coverage"
 	@echo "    test-cover-check  - Fail if any function < 100%%"
+	@echo "    test-cross-device - Ubuntu 26.04 EXDEV self-update repro"
 	@echo "    lint        - Run linter"
 	@echo "    fmt         - Format code"
 	@echo "    run         - Build and run the application"

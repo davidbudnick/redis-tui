@@ -608,6 +608,114 @@ func TestCopyFile(t *testing.T) {
 	})
 }
 
+func TestReplaceBinary_RealCrossDevice(t *testing.T) {
+	srcDir, destDir := realCrossDeviceDirs(t)
+
+	t.Run("rename fails with EXDEV", func(t *testing.T) {
+		src := filepath.Join(srcDir, "probe-new")
+		dest := filepath.Join(destDir, "probe-dest")
+		if err := os.WriteFile(src, []byte("probe"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		err := os.Rename(src, dest)
+		if err == nil {
+			t.Fatal("os.Rename succeeded; src and dest are not on different devices")
+		}
+		if !isCrossDevice(err) {
+			t.Fatalf("os.Rename error = %v, want EXDEV", err)
+		}
+		t.Logf("reproduced issue #71: %v", err)
+	})
+
+	t.Run("replace existing", func(t *testing.T) {
+		current := filepath.Join(destDir, "redis-tui")
+		newBin := filepath.Join(srcDir, "redis-tui-new")
+		if err := os.WriteFile(current, []byte("old"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(newBin, []byte("new-cross-device"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := replaceBinary(current, newBin); err != nil {
+			t.Fatalf("replaceBinary: %v", err)
+		}
+
+		data, err := os.ReadFile(current)
+		if err != nil {
+			t.Fatalf("read failed: %v", err)
+		}
+		if string(data) != "new-cross-device" {
+			t.Errorf("content = %q, want %q", string(data), "new-cross-device")
+		}
+
+		info, err := os.Stat(current)
+		if err != nil {
+			t.Fatalf("stat failed: %v", err)
+		}
+		if info.Mode().Perm()&0o100 == 0 {
+			t.Errorf("mode = %v, want executable", info.Mode())
+		}
+		if _, err := os.Stat(current + ".old"); !os.IsNotExist(err) {
+			t.Error("expected .old backup to be removed")
+		}
+	})
+
+	t.Run("no existing binary", func(t *testing.T) {
+		current := filepath.Join(destDir, "redis-tui-fresh")
+		newBin := filepath.Join(srcDir, "redis-tui-fresh-new")
+		if err := os.WriteFile(newBin, []byte("fresh-cross-device"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := replaceBinary(current, newBin); err != nil {
+			t.Fatalf("replaceBinary: %v", err)
+		}
+
+		data, err := os.ReadFile(current)
+		if err != nil {
+			t.Fatalf("read failed: %v", err)
+		}
+		if string(data) != "fresh-cross-device" {
+			t.Errorf("content = %q, want %q", string(data), "fresh-cross-device")
+		}
+	})
+}
+
+func realCrossDeviceDirs(t *testing.T) (string, string) {
+	t.Helper()
+
+	srcRoot := os.Getenv("CROSS_DEVICE_SRC")
+	destRoot := os.Getenv("CROSS_DEVICE_DEST")
+	required := os.Getenv("REQUIRE_CROSS_DEVICE") == "1"
+
+	if srcRoot == "" || destRoot == "" {
+		if required {
+			t.Fatal("REQUIRE_CROSS_DEVICE=1 requires CROSS_DEVICE_SRC and CROSS_DEVICE_DEST")
+		}
+		t.Skip("set CROSS_DEVICE_SRC and CROSS_DEVICE_DEST to run the real EXDEV test")
+	}
+
+	srcDir := filepath.Join(srcRoot, "redis-tui-exdev-src")
+	destDir := filepath.Join(destRoot, "redis-tui-exdev-dest")
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		t.Fatalf("create src dir: %v", err)
+	}
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		t.Fatalf("create dest dir: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(srcDir); err != nil {
+			t.Errorf("cleanup src dir: %v", err)
+		}
+		if err := os.RemoveAll(destDir); err != nil {
+			t.Errorf("cleanup dest dir: %v", err)
+		}
+	})
+	return srcDir, destDir
+}
+
 func TestCheckWriteAccess(t *testing.T) {
 	t.Run("writable directory", func(t *testing.T) {
 		tmpDir := t.TempDir()
