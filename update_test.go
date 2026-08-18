@@ -507,13 +507,7 @@ func TestReplaceBinary(t *testing.T) {
 			t.Errorf("content = %q, want %q", string(data), "new")
 		}
 
-		info, err := os.Stat(current)
-		if err != nil {
-			t.Fatalf("stat failed: %v", err)
-		}
-		if info.Mode().Perm()&0o100 == 0 {
-			t.Errorf("mode = %v, want executable", info.Mode())
-		}
+		assertUnixExecutable(t, current)
 	})
 
 	t.Run("cross device copy dest error restores backup", func(t *testing.T) {
@@ -650,13 +644,7 @@ func TestReplaceBinary_RealCrossDevice(t *testing.T) {
 			t.Errorf("content = %q, want %q", string(data), "new-cross-device")
 		}
 
-		info, err := os.Stat(current)
-		if err != nil {
-			t.Fatalf("stat failed: %v", err)
-		}
-		if info.Mode().Perm()&0o100 == 0 {
-			t.Errorf("mode = %v, want executable", info.Mode())
-		}
+		assertUnixExecutable(t, current)
 		if _, err := os.Stat(current + ".old"); !os.IsNotExist(err) {
 			t.Error("expected .old backup to be removed")
 		}
@@ -781,6 +769,20 @@ func TestUpdateTempDir(t *testing.T) {
 			t.Errorf("osMkdirTemp calls = %d, want 2", calls)
 		}
 	})
+}
+
+func assertUnixExecutable(t *testing.T, path string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		return
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat failed: %v", err)
+	}
+	if info.Mode().Perm()&0o100 == 0 {
+		t.Errorf("mode = %v, want executable", info.Mode())
+	}
 }
 
 func TestReplaceBinaryLegacy_SameDevice(t *testing.T) {
@@ -1347,16 +1349,12 @@ func TestRunUpdate_ChecksumDownloadError(t *testing.T) {
 
 func TestReplaceBinary_BackupRenameError(t *testing.T) {
 	tmpDir := t.TempDir()
-	// Create a directory at the "current" path — os.Rename to .old will
-	// fail with a different error if .old already exists as a directory.
 	current := filepath.Join(tmpDir, "redis-tui")
-	if err := os.Mkdir(current, 0o755); err != nil {
+	if err := os.WriteFile(current, []byte("old"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// Create a file at .old so Rename(current, .old) fails because
-	// on some OSes you can't rename a dir over a file.
 	oldPath := current + ".old"
-	if err := os.WriteFile(oldPath, []byte("x"), 0o644); err != nil {
+	if err := os.MkdirAll(filepath.Join(oldPath, "nested"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1383,26 +1381,20 @@ func TestRunUpdate_UserHomeDirError(t *testing.T) {
 	githubAPIBase = srv.URL
 	defer func() { githubAPIBase = oldAPI }()
 
-	// Create exec in a read-only dir so checkWriteAccess fails.
 	tmpDir := t.TempDir()
-	readOnlyDir := filepath.Join(tmpDir, "readonly")
-	if err := os.MkdirAll(readOnlyDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	execPath := filepath.Join(readOnlyDir, "redis-tui")
+	execPath := filepath.Join(tmpDir, "redis-tui")
 	if err := os.WriteFile(execPath, []byte("bin"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chmod(readOnlyDir, 0o555); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(readOnlyDir, 0o755) })
 
 	origExec := osExecutable
 	osExecutable = func() (string, error) { return execPath, nil }
 	t.Cleanup(func() { osExecutable = origExec })
 
-	// Make UserHomeDir fail.
+	origCreate := osCreateTemp
+	osCreateTemp = func(string, string) (*os.File, error) { return nil, fmt.Errorf("no write") }
+	t.Cleanup(func() { osCreateTemp = origCreate })
+
 	origHome := osUserHomeDir
 	osUserHomeDir = func() (string, error) { return "", fmt.Errorf("no home") }
 	t.Cleanup(func() { osUserHomeDir = origHome })
@@ -1426,22 +1418,18 @@ func TestRunUpdate_MkdirAllError(t *testing.T) {
 	defer func() { githubAPIBase = oldAPI }()
 
 	tmpDir := t.TempDir()
-	readOnlyDir := filepath.Join(tmpDir, "readonly")
-	if err := os.MkdirAll(readOnlyDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	execPath := filepath.Join(readOnlyDir, "redis-tui")
+	execPath := filepath.Join(tmpDir, "redis-tui")
 	if err := os.WriteFile(execPath, []byte("bin"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chmod(readOnlyDir, 0o555); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(readOnlyDir, 0o755) })
 
 	origExec := osExecutable
 	osExecutable = func() (string, error) { return execPath, nil }
 	t.Cleanup(func() { osExecutable = origExec })
+
+	origCreate := osCreateTemp
+	osCreateTemp = func(string, string) (*os.File, error) { return nil, fmt.Errorf("no write") }
+	t.Cleanup(func() { osCreateTemp = origCreate })
 
 	// Return a home dir that's a file (not dir) so MkdirAll fails.
 	homeFile := filepath.Join(tmpDir, "fakehome")
@@ -1777,6 +1765,8 @@ func TestIsHomebrew(t *testing.T) {
 		{"/opt/homebrew/bin/redis-tui", true},
 		{"/usr/local/bin/redis-tui", false},
 		{"/home/user/go/bin/redis-tui", false},
+		{`C:\homebrew\bin\redis-tui`, true},
+		{`C:\Cellar\redis-tui\bin\redis-tui`, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {

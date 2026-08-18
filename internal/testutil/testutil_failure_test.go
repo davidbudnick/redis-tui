@@ -179,6 +179,9 @@ func TestAssertConnectionNotExists_ListError(t *testing.T) {
 }
 
 func TestMustAddConnection_Failure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test requires Unix directory permissions")
+	}
 	if os.Geteuid() == 0 {
 		t.Skip("test requires non-root user to enforce file permissions")
 	}

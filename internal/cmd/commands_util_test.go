@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -182,6 +183,8 @@ func TestDetectUpgradeCmd(t *testing.T) {
 		{"homebrew path", "/opt/homebrew/bin/redis-tui", nil, "brew upgrade redis-tui"},
 		{"go bin path", "/Users/me/go/bin/redis-tui", nil, "go install github.com/davidbudnick/redis-tui@latest"},
 		{"generic path", "/usr/local/bin/redis-tui", nil, "redis-tui --update"},
+		{"windows homebrew path", `C:\homebrew\bin\redis-tui`, nil, "brew upgrade redis-tui"},
+		{"windows go bin path", `C:\Users\me\go\bin\redis-tui`, nil, "go install github.com/davidbudnick/redis-tui@latest"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -225,16 +228,28 @@ func withDetectedOS(t *testing.T, os string) {
 	t.Cleanup(func() { detectedOS = orig })
 }
 
+func fakeLookPathBin(t *testing.T, dir, name string) {
+	t.Helper()
+	content := []byte("#!/bin/sh\nexit 0\n")
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+		content = []byte("MZ")
+	}
+	if err := os.WriteFile(filepath.Join(dir, name), content, 0o755); err != nil {
+		t.Fatalf("write fake %s: %v", name, err)
+	}
+}
+
 func TestCopyToClipboard(t *testing.T) {
 	t.Run("returns cmd", func(t *testing.T) {
-		withDetectedOS(t, "linux")
-		binDir := t.TempDir()
-		fakePath := filepath.Join(binDir, "xclip")
-		if err := os.WriteFile(fakePath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-			t.Fatalf("write fake xclip: %v", err)
+		if runtime.GOOS == "windows" {
+			withDetectedOS(t, "windows")
+		} else {
+			withDetectedOS(t, "linux")
+			binDir := t.TempDir()
+			fakeLookPathBin(t, binDir, "xclip")
+			t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 		}
-
-		t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 		cmds := NewCommands(nil, nil)
 		cmd := cmds.CopyToClipboard("test content")
@@ -289,12 +304,8 @@ func TestClipboardCmd(t *testing.T) {
 	t.Run("linux with xclip", func(t *testing.T) {
 		withDetectedOS(t, "linux")
 
-		// Create a fake xclip in a temp dir and prepend it to PATH.
 		binDir := t.TempDir()
-		fakePath := filepath.Join(binDir, "xclip")
-		if err := os.WriteFile(fakePath, []byte("#!/bin/sh\n"), 0o755); err != nil {
-			t.Fatalf("write fake xclip: %v", err)
-		}
+		fakeLookPathBin(t, binDir, "xclip")
 		t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 		name, args := clipboardCmd()
@@ -309,13 +320,8 @@ func TestClipboardCmd(t *testing.T) {
 	t.Run("linux with xsel only", func(t *testing.T) {
 		withDetectedOS(t, "linux")
 
-		// Create a fake xsel (but NOT xclip) in a temp dir.
 		binDir := t.TempDir()
-		fakePath := filepath.Join(binDir, "xsel")
-		if err := os.WriteFile(fakePath, []byte("#!/bin/sh\n"), 0o755); err != nil {
-			t.Fatalf("write fake xsel: %v", err)
-		}
-		// Set PATH to ONLY this dir so xclip won't be found.
+		fakeLookPathBin(t, binDir, "xsel")
 		t.Setenv("PATH", binDir)
 
 		name, args := clipboardCmd()

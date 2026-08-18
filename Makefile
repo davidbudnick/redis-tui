@@ -6,7 +6,7 @@ COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE := $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 LDFLAGS := -ldflags "-X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)"
 
-.PHONY: all build install clean test bench test-cover test-cover-check test-cross-device lint run start release snapshot demo screenshots \
+.PHONY: all build install clean test bench test-cover test-cover-check test-cross-device ci ci-security test-windows-compile lint run start release snapshot demo screenshots \
 	docker-up docker-down docker-seed docker-up-all docker-down-all docker-seed-all \
 	docker-up-standalone docker-up-standalone-stack docker-up-cluster docker-up-cluster-stack \
 	docker-down-standalone docker-down-standalone-stack docker-down-cluster docker-down-cluster-stack \
@@ -74,6 +74,23 @@ test-cross-device:
 		-e REQUIRE_CROSS_DEVICE=1 \
 		redis-tui-cross-device \
 		sh scripts/test-cross-device-update.sh
+
+## Compile tests for Windows without running them (catches GOOS-specific compile breaks).
+test-windows-compile:
+	@tmpdir=$$(mktemp -d); \
+	trap 'rm -rf "$$tmpdir"' EXIT; \
+	for pkg in $$(go list ./...); do \
+		echo "GOOS=windows go test -c $$pkg"; \
+		GOOS=windows GOARCH=amd64 go test -c -o "$$tmpdir/test.exe" "$$pkg" || exit 1; \
+	done
+
+## Run gosec + govulncheck at the versions CI pins.
+ci-security:
+	go run github.com/securego/gosec/v2/cmd/gosec@v2.22.4 ./...
+	go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+
+## Local stand-in for GitHub Actions. Run this before every push.
+ci: fmt lint test-cover-check ci-security build-all test-windows-compile test-cross-device
 
 ## Run linter
 lint:
@@ -203,6 +220,9 @@ help:
 	@echo "    test-cover        - Run tests with coverage"
 	@echo "    test-cover-check  - Fail if any function < 100%%"
 	@echo "    test-cross-device - Ubuntu 26.04 EXDEV self-update repro"
+	@echo "    test-windows-compile - Compile tests as GOOS=windows"
+	@echo "    ci-security - gosec + govulncheck (CI versions)"
+	@echo "    ci          - Full local pipeline; run before push"
 	@echo "    lint        - Run linter"
 	@echo "    fmt         - Format code"
 	@echo "    run         - Build and run the application"

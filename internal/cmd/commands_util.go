@@ -133,10 +133,11 @@ func detectUpgradeCmd() string {
 		return "redis-tui --update"
 	}
 
-	if strings.Contains(execPath, "/Cellar/") || strings.Contains(execPath, "/homebrew/") {
+	p := strings.ReplaceAll(execPath, `\`, "/")
+	if strings.Contains(p, "/Cellar/") || strings.Contains(p, "/homebrew/") {
 		return "brew upgrade redis-tui"
 	}
-	if strings.Contains(execPath, "/go/bin/") {
+	if strings.Contains(p, "/go/bin/") {
 		return "go install github.com/davidbudnick/redis-tui@latest"
 	}
 	return "redis-tui --update"

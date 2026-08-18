@@ -364,7 +364,8 @@ func isSemver(s string) bool {
 }
 
 func isHomebrew(path string) bool {
-	return strings.Contains(path, "/Cellar/") || strings.Contains(path, "/homebrew/")
+	p := strings.ReplaceAll(path, `\`, "/")
+	return strings.Contains(p, "/Cellar/") || strings.Contains(p, "/homebrew/")
 }
 
 func checkWriteAccess(path string) error {
