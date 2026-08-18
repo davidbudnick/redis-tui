@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/davidbudnick/redis-tui/internal/cmd"
 	"github.com/davidbudnick/redis-tui/internal/db"
@@ -237,7 +238,7 @@ func initConfig() (*db.Config, error) {
 		legacyPath := filepath.Join(homeDir, ".redis", "config.json")
 		if info, legacyStatErr := os.Stat(legacyPath); legacyStatErr == nil {
 			// Refuse to migrate files writable by others (mode & 0o022).
-			if info.Mode().Perm()&0o022 != 0 {
+			if runtime.GOOS != "windows" && info.Mode().Perm()&0o022 != 0 {
 				slog.Warn("Legacy config has unsafe permissions, skipping migration", "path", legacyPath, "mode", info.Mode().Perm())
 			} else {
 				legacyCfg, loadErr := db.NewConfig(legacyPath)

@@ -803,8 +803,12 @@ func TestMain_SetupError(t *testing.T) {
 	_ = withExitTrap(t)
 	withFatalTrap(t)
 
+	blockedHome := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(blockedHome, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	origHome := userHomeDir
-	userHomeDir = func() (string, error) { return "/dev/null", nil }
+	userHomeDir = func() (string, error) { return blockedHome, nil }
 	t.Cleanup(func() { userHomeDir = origHome })
 
 	withRunApp(t, func(_ ui.Model) error { return nil })
@@ -875,13 +879,16 @@ func TestSetup_WithHost(t *testing.T) {
 	}
 }
 
-
 func TestSetup_ConfigError(t *testing.T) {
 	withOsArgs(t, []string{"redis-tui"})
 	_ = withExitTrap(t)
 
+	blockedHome := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(blockedHome, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	orig := userHomeDir
-	userHomeDir = func() (string, error) { return "/dev/null", nil }
+	userHomeDir = func() (string, error) { return blockedHome, nil }
 	t.Cleanup(func() { userHomeDir = orig })
 
 	_, err := setup()
@@ -980,9 +987,9 @@ func TestInitConfig_LegacyMigration_UnsafePermsSkipped(t *testing.T) {
 
 func TestParseFlags_PasswordWarning(t *testing.T) {
 	tests := []struct {
-		name      string
-		args      []string
-		wantWarn  bool
+		name     string
+		args     []string
+		wantWarn bool
 	}{
 		{"short flag -a", []string{"-h", "localhost", "-a", "secret"}, true},
 		{"long flag --password", []string{"--host", "localhost", "--password", "secret"}, true},

@@ -16,7 +16,10 @@ make fmt          # Format code with go fmt
 make run          # Build and run the application (make start is an alias)
 make dev-deps         # Install goreleaser
 make test-cover-check # Tests + fail if any function < 100% coverage
+make ci           # Full local pipeline — run before every push
 ```
+
+**Run `make ci` before every push.** It is the local stand-in for GitHub Actions: `gofmt` + `go vet` + `go test -race` with 100% function coverage, gosec, govulncheck, cross-compile for linux/darwin/windows, compile tests as `GOOS=windows`, and the Ubuntu 26.04 cross-device update repro (needs Docker). Do not push until it is green. CI also runs that same suite on Ubuntu, macOS, and Windows hosts — Unix-only tests must skip or stay portable on Windows.
 
 CI runs `go test -v -race -coverprofile=coverage.out ./...` — always ensure tests pass with `-race`. CI enforces **100% statement coverage** per function — any new code must include tests.
 
