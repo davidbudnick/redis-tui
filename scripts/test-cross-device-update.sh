@@ -49,4 +49,5 @@ fi
 echo "hard link failed as expected: $LN_ERR"
 
 echo "=== Verifying replaceBinary copies on EXDEV ==="
-go test -count=1 -race -v -run TestReplaceBinary_RealCrossDevice .
+echo "=== and that 1.0.42 can escape via same-device TMPDIR ==="
+go test -count=1 -race -v -run 'TestReplaceBinary_RealCrossDevice|TestReplaceBinaryLegacy_SameDevice|TestUpdateTempDir' .

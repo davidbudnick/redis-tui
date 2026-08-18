@@ -662,6 +662,56 @@ func TestReplaceBinary_RealCrossDevice(t *testing.T) {
 		}
 	})
 
+	t.Run("legacy 1.0.42 rename across devices fails", func(t *testing.T) {
+		current := filepath.Join(destDir, "redis-tui-legacy")
+		newBin := filepath.Join(srcDir, "redis-tui-legacy-new")
+		if err := os.WriteFile(current, []byte("old"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(newBin, []byte("new-legacy"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		err := replaceBinaryLegacy(current, newBin)
+		if err == nil {
+			t.Fatal("1.0.42 rename-only replace unexpectedly succeeded")
+		}
+		if !isCrossDevice(err) {
+			t.Fatalf("legacy replace error = %v, want EXDEV", err)
+		}
+
+		data, err := os.ReadFile(current)
+		if err != nil {
+			t.Fatalf("read failed: %v", err)
+		}
+		if string(data) != "old" {
+			t.Errorf("content = %q, want original restored", string(data))
+		}
+	})
+
+	t.Run("legacy 1.0.42 TMPDIR same-device escape", func(t *testing.T) {
+		current := filepath.Join(destDir, "redis-tui-escape")
+		newBin := filepath.Join(destDir, "redis-tui-escape-new")
+		if err := os.WriteFile(current, []byte("old"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(newBin, []byte("escaped"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := replaceBinaryLegacy(current, newBin); err != nil {
+			t.Fatalf("same-device 1.0.42 replace failed: %v", err)
+		}
+
+		data, err := os.ReadFile(current)
+		if err != nil {
+			t.Fatalf("read failed: %v", err)
+		}
+		if string(data) != "escaped" {
+			t.Errorf("content = %q, want %q", string(data), "escaped")
+		}
+	})
+
 	t.Run("no existing binary", func(t *testing.T) {
 		current := filepath.Join(destDir, "redis-tui-fresh")
 		newBin := filepath.Join(srcDir, "redis-tui-fresh-new")
@@ -681,6 +731,101 @@ func TestReplaceBinary_RealCrossDevice(t *testing.T) {
 			t.Errorf("content = %q, want %q", string(data), "fresh-cross-device")
 		}
 	})
+}
+
+func TestUpdateTempDir(t *testing.T) {
+	t.Run("prefers dest directory", func(t *testing.T) {
+		destDir := t.TempDir()
+		dir, err := updateTempDir(filepath.Join(destDir, "redis-tui"))
+		if err != nil {
+			t.Fatalf("updateTempDir: %v", err)
+		}
+		t.Cleanup(func() {
+			if err := os.RemoveAll(dir); err != nil {
+				t.Errorf("cleanup: %v", err)
+			}
+		})
+		if filepath.Dir(dir) != destDir {
+			t.Errorf("temp dir %q is not under dest %q", dir, destDir)
+		}
+	})
+
+	t.Run("falls back to system temp", func(t *testing.T) {
+		orig := osMkdirTemp
+		calls := 0
+		osMkdirTemp = func(dir, pattern string) (string, error) {
+			calls++
+			if calls == 1 {
+				if dir == "" {
+					t.Error("first attempt should use dest dir, not system temp")
+				}
+				return "", fmt.Errorf("dest not writable")
+			}
+			if dir != "" {
+				t.Errorf("fallback dir = %q, want system temp", dir)
+			}
+			return orig(dir, pattern)
+		}
+		t.Cleanup(func() { osMkdirTemp = orig })
+
+		dir, err := updateTempDir(filepath.Join(t.TempDir(), "redis-tui"))
+		if err != nil {
+			t.Fatalf("updateTempDir: %v", err)
+		}
+		t.Cleanup(func() {
+			if err := os.RemoveAll(dir); err != nil {
+				t.Errorf("cleanup: %v", err)
+			}
+		})
+		if calls != 2 {
+			t.Errorf("osMkdirTemp calls = %d, want 2", calls)
+		}
+	})
+}
+
+func TestReplaceBinaryLegacy_SameDevice(t *testing.T) {
+	tmpDir := t.TempDir()
+	current := filepath.Join(tmpDir, "redis-tui")
+	newBin := filepath.Join(tmpDir, "redis-tui-new")
+	if err := os.WriteFile(current, []byte("old"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(newBin, []byte("from-tmpdir"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := replaceBinaryLegacy(current, newBin); err != nil {
+		t.Fatalf("legacy replace: %v", err)
+	}
+
+	data, err := os.ReadFile(current)
+	if err != nil {
+		t.Fatalf("read failed: %v", err)
+	}
+	if string(data) != "from-tmpdir" {
+		t.Errorf("content = %q, want %q", string(data), "from-tmpdir")
+	}
+}
+
+func replaceBinaryLegacy(currentPath, newPath string) error {
+	oldPath := currentPath + ".old"
+	hasBackup := true
+	if err := os.Rename(currentPath, oldPath); err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		hasBackup = false
+	}
+	if err := os.Rename(newPath, currentPath); err != nil {
+		if hasBackup {
+			_ = os.Rename(oldPath, currentPath)
+		}
+		return err
+	}
+	if hasBackup {
+		_ = os.Remove(oldPath)
+	}
+	return nil
 }
 
 func realCrossDeviceDirs(t *testing.T) (string, string) {
@@ -1418,6 +1563,9 @@ func TestRunUpdate_ReplaceBinaryError(t *testing.T) {
 	err := runUpdate("1.0.0")
 	if err == nil || !strings.Contains(err.Error(), "failed to replace binary") {
 		t.Errorf("error = %v, want replace binary error", err)
+	}
+	if !strings.Contains(err.Error(), "TMPDIR=") {
+		t.Errorf("error = %v, want TMPDIR recovery hint", err)
 	}
 }
 

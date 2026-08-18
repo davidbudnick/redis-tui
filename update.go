@@ -93,7 +93,7 @@ func runUpdate(currentVersion string) error {
 	archiveURL := baseURL + "/" + archive
 	checksumURL := baseURL + "/checksums.txt"
 
-	tmpDir, err := osMkdirTemp("", "redis-tui-update-*")
+	tmpDir, err := updateTempDir(execPath)
 	if err != nil {
 		return fmt.Errorf("could not create temp directory: %w", err)
 	}
@@ -121,7 +121,7 @@ func runUpdate(currentVersion string) error {
 	}
 
 	if err := replaceBinary(execPath, newBinaryPath); err != nil {
-		return fmt.Errorf("failed to replace binary: %w", err)
+		return fmt.Errorf("failed to replace binary: %w\n\nIf you see \"invalid cross-device link\", retry with:\n  TMPDIR=%q redis-tui --update\nor reinstall:\n  curl -fsSL https://raw.githubusercontent.com/davidbudnick/redis-tui/main/install.sh | bash", err, filepath.Dir(execPath))
 	}
 
 	fmt.Printf("Successfully updated to v%s.\n", ver)
@@ -283,6 +283,15 @@ func extractBinary(archivePath, destPath string) error {
 	}
 
 	return fmt.Errorf("binary not found in archive")
+}
+
+// updateTempDir stages the download on destPath's filesystem, then falls back to the system temp dir.
+func updateTempDir(destPath string) (string, error) {
+	dir, err := osMkdirTemp(filepath.Dir(destPath), ".redis-tui-update-*")
+	if err == nil {
+		return dir, nil
+	}
+	return osMkdirTemp("", "redis-tui-update-*")
 }
 
 func replaceBinary(currentPath, newPath string) error {
