@@ -163,6 +163,18 @@ redis-tui --host redis.example.com --tls --tls-ca /path/to/ca.pem
 redis-tui --update
 ```
 
+1.0.42 and 1.0.43 fail `--update` when `/tmp` and the install dir are on different disks (`invalid cross-device link`). Those builds still honor `TMPDIR`, so this keeps `--update` on the same filesystem as `~/.local/bin`:
+
+```bash
+TMPDIR="$HOME" redis-tui --update
+```
+
+Or reinstall; the install script's `mv` already copies across devices:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/davidbudnick/redis-tui/main/install.sh | bash
+```
+
 When `--host` is provided the TUI connects automatically on startup. Without flags the interactive connection manager is shown.
 
 Press `?` inside the app to view the full help screen.
