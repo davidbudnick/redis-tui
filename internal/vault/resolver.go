@@ -3,8 +3,10 @@ package vault
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/hashicorp/vault/api/cliconfig"
@@ -63,10 +65,8 @@ func (r *Resolver) Resolve(ctx context.Context, path string, selectors ...string
 	}
 
 	data := secret.Data
-	if nested, ok := data["data"].(map[string]any); ok {
-		if _, isKVv2 := data["metadata"]; isKVv2 {
-			data = nested
-		}
+	if nested, ok := kvV2Data(data); ok {
+		data = nested
 	}
 
 	values := make(map[string]string, len(selectors))
@@ -82,6 +82,28 @@ func (r *Resolver) Resolve(ctx context.Context, path string, selectors ...string
 		values[selector] = text
 	}
 	return values, nil
+}
+
+func kvV2Data(data map[string]any) (map[string]any, bool) {
+	nested, dataOK := data["data"].(map[string]any)
+	metadata, metadataOK := data["metadata"].(map[string]any)
+	return nested, dataOK && metadataOK && isKVV2Metadata(metadata)
+}
+
+func isKVV2Metadata(metadata map[string]any) bool {
+	versionNumber, versionOK := metadata["version"].(json.Number)
+	version, versionErr := versionNumber.Int64()
+	created, createdOK := metadata["created_time"].(string)
+	deletion, deletionOK := metadata["deletion_time"].(string)
+	_, destroyedOK := metadata["destroyed"].(bool)
+	return versionOK && versionErr == nil && version > 0 &&
+		createdOK && validVaultTimestamp(created) && deletionOK &&
+		(deletion == "" || validVaultTimestamp(deletion)) && destroyedOK
+}
+
+func validVaultTimestamp(value string) bool {
+	_, err := time.Parse(time.RFC3339Nano, value)
+	return err == nil
 }
 
 func lookup(data map[string]any, selector string) (any, bool) {
