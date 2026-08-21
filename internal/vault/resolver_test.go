@@ -2,6 +2,7 @@ package vault
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,39 @@ import (
 	"github.com/mitchellh/go-homedir"
 )
 
+func TestIsKVV2Metadata(t *testing.T) {
+	valid := map[string]any{
+		"created_time":  "2026-08-21T19:00:00.123456789Z",
+		"deletion_time": "",
+		"destroyed":     false,
+		"version":       json.Number("1"),
+	}
+	tests := []struct {
+		name     string
+		metadata map[string]any
+		want     bool
+	}{
+		{name: "valid", metadata: valid, want: true},
+		{name: "valid deletion time", metadata: map[string]any{"created_time": "2026-08-21T19:00:00Z", "deletion_time": "2026-08-22T19:00:00Z", "destroyed": true, "version": json.Number("2")}, want: true},
+		{name: "missing created time", metadata: map[string]any{"deletion_time": "", "destroyed": false, "version": json.Number("1")}},
+		{name: "invalid created time", metadata: map[string]any{"created_time": "yesterday", "deletion_time": "", "destroyed": false, "version": json.Number("1")}},
+		{name: "missing deletion time", metadata: map[string]any{"created_time": "2026-08-21T19:00:00Z", "destroyed": false, "version": json.Number("1")}},
+		{name: "invalid deletion time", metadata: map[string]any{"created_time": "2026-08-21T19:00:00Z", "deletion_time": "tomorrow", "destroyed": false, "version": json.Number("1")}},
+		{name: "missing destroyed", metadata: map[string]any{"created_time": "2026-08-21T19:00:00Z", "deletion_time": "", "version": json.Number("1")}},
+		{name: "invalid version type", metadata: map[string]any{"created_time": "2026-08-21T19:00:00Z", "deletion_time": "", "destroyed": false, "version": 1}},
+		{name: "non-integer version", metadata: map[string]any{"created_time": "2026-08-21T19:00:00Z", "deletion_time": "", "destroyed": false, "version": json.Number("1.5")}},
+		{name: "zero version", metadata: map[string]any{"created_time": "2026-08-21T19:00:00Z", "deletion_time": "", "destroyed": false, "version": json.Number("0")}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isKVV2Metadata(tt.metadata); got != tt.want {
+				t.Errorf("isKVV2Metadata() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestResolverResolve(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -25,9 +59,10 @@ func TestResolverResolve(t *testing.T) {
 		wantErr     string
 		wantAPIPath string
 	}{
-		{name: "KV v2", response: `{"data":{"data":{"password":"vault-secret"},"metadata":{"version":1}}}`, status: http.StatusOK, path: "/secret/data/redis", key: "password", want: "vault-secret", wantAPIPath: "/v1/secret/data/redis"},
+		{name: "KV v2", response: `{"data":{"data":{"password":"vault-secret"},"metadata":{"created_time":"2026-08-21T19:00:00.123456789Z","deletion_time":"","destroyed":false,"version":1}}}`, status: http.StatusOK, path: "/secret/data/redis", key: "password", want: "vault-secret", wantAPIPath: "/v1/secret/data/redis"},
 		{name: "KV v1", response: `{"data":{"password":"vault-secret"}}`, status: http.StatusOK, path: "secret/redis", key: "password", want: "vault-secret", wantAPIPath: "/v1/secret/redis"},
 		{name: "KV v1 data field", response: `{"data":{"password":"vault-secret","data":{"other":"value"}}}`, status: http.StatusOK, path: "secret/redis", key: "password", want: "vault-secret", wantAPIPath: "/v1/secret/redis"},
+		{name: "KV v1 data and metadata fields", response: `{"data":{"password":"vault-secret","data":{"password":"wrong-secret"},"metadata":{"version":1}}}`, status: http.StatusOK, path: "secret/redis", key: "password", want: "vault-secret", wantAPIPath: "/v1/secret/redis"},
 		{name: "nested key", response: `{"data":{"credentials":{"VALKEY":{"password":"vault-secret"}}}}`, status: http.StatusOK, path: "secret/redis", key: "credentials.VALKEY.password", want: "vault-secret", wantAPIPath: "/v1/secret/redis"},
 		{name: "missing secret", status: http.StatusNotFound, path: "secret/missing", key: "password", wantErr: "was not found", wantAPIPath: "/v1/secret/missing"},
 		{name: "missing key", response: `{"data":{"username":"redis"}}`, status: http.StatusOK, path: "secret/redis", key: "password", wantErr: `does not contain key "password"`, wantAPIPath: "/v1/secret/redis"},
