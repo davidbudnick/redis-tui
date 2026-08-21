@@ -15,8 +15,8 @@ func TestNewModel(t *testing.T) {
 	}
 
 	// Check inputs are initialized
-	if len(m.ConnInputs) != 6 {
-		t.Errorf("ConnInputs length = %d, want 6", len(m.ConnInputs))
+	if len(m.ConnInputs) != 9 {
+		t.Errorf("ConnInputs length = %d, want 9", len(m.ConnInputs))
 	}
 
 	if len(m.AddKeyInputs) != 3 {
@@ -40,8 +40,8 @@ func TestNewModel(t *testing.T) {
 		t.Errorf("Port default = %q, want \"6379\"", m.ConnInputs[2].Value())
 	}
 
-	if m.ConnInputs[5].Value() != "0" {
-		t.Errorf("DB default = %q, want \"0\"", m.ConnInputs[5].Value())
+	if m.ConnInputs[8].Value() != "0" {
+		t.Errorf("DB default = %q, want \"0\"", m.ConnInputs[8].Value())
 	}
 
 	// Check TreeExpanded map is initialized
@@ -107,7 +107,7 @@ func TestModel_GetDB(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := NewModel()
-			m.ConnInputs[5].SetValue(tt.value)
+			m.ConnInputs[8].SetValue(tt.value)
 
 			got := m.getDB()
 			if got != tt.expected {
@@ -126,7 +126,10 @@ func TestModel_ResetConnInputs(t *testing.T) {
 	m.ConnInputs[2].SetValue("6380")
 	m.ConnInputs[3].SetValue("user")
 	m.ConnInputs[4].SetValue("secret")
-	m.ConnInputs[5].SetValue("5")
+	m.ConnInputs[5].SetValue("secret/data/redis")
+	m.ConnInputs[6].SetValue("credentials.redis.username")
+	m.ConnInputs[7].SetValue("credentials.redis.password")
+	m.ConnInputs[8].SetValue("5")
 	m.ConnFocusIdx = 3
 
 	// Reset
@@ -148,8 +151,11 @@ func TestModel_ResetConnInputs(t *testing.T) {
 	if m.ConnInputs[4].Value() != "" {
 		t.Errorf("Password should be empty, got %q", m.ConnInputs[4].Value())
 	}
-	if m.ConnInputs[5].Value() != "0" {
-		t.Errorf("DB = %q, want \"0\"", m.ConnInputs[5].Value())
+	if m.ConnInputs[5].Value() != "" || m.ConnInputs[6].Value() != "" || m.ConnInputs[7].Value() != "" {
+		t.Errorf("Vault reference should be empty, got %q/%q/%q", m.ConnInputs[5].Value(), m.ConnInputs[6].Value(), m.ConnInputs[7].Value())
+	}
+	if m.ConnInputs[8].Value() != "0" {
+		t.Errorf("DB = %q, want \"0\"", m.ConnInputs[8].Value())
 	}
 	if m.ConnFocusIdx != 0 {
 		t.Errorf("ConnFocusIdx = %d, want 0", m.ConnFocusIdx)
@@ -191,12 +197,15 @@ func TestModel_PopulateConnInputs(t *testing.T) {
 	m := NewModel()
 
 	conn := types.Connection{
-		Name:     "Production",
-		Host:     "redis.prod.com",
-		Port:     6380,
-		Username: "default",
-		Password: "supersecret",
-		DB:       2,
+		Name:             "Production",
+		Host:             "redis.prod.com",
+		Port:             6380,
+		Username:         "default",
+		Password:         "supersecret",
+		VaultPath:        "secret/data/redis",
+		VaultUserKey:     "credentials.redis.username",
+		VaultPasswordKey: "credentials.redis.password",
+		DB:               2,
 	}
 
 	m.populateConnInputs(conn)
@@ -216,8 +225,11 @@ func TestModel_PopulateConnInputs(t *testing.T) {
 	if m.ConnInputs[4].Value() != "supersecret" {
 		t.Errorf("Password = %q, want \"supersecret\"", m.ConnInputs[4].Value())
 	}
-	if m.ConnInputs[5].Value() != "2" {
-		t.Errorf("DB = %q, want \"2\"", m.ConnInputs[5].Value())
+	if m.ConnInputs[5].Value() != "secret/data/redis" || m.ConnInputs[6].Value() != "credentials.redis.username" || m.ConnInputs[7].Value() != "credentials.redis.password" {
+		t.Errorf("Vault reference = %q/%q/%q", m.ConnInputs[5].Value(), m.ConnInputs[6].Value(), m.ConnInputs[7].Value())
+	}
+	if m.ConnInputs[8].Value() != "2" {
+		t.Errorf("DB = %q, want \"2\"", m.ConnInputs[8].Value())
 	}
 }
 
@@ -230,7 +242,10 @@ func TestModel_ConvertCurrentInputsToConnection_Add(t *testing.T) {
 	m.ConnInputs[2].SetValue("6380")
 	m.ConnInputs[3].SetValue("user")
 	m.ConnInputs[4].SetValue("secret")
-	m.ConnInputs[5].SetValue("5")
+	m.ConnInputs[5].SetValue("secret/data/redis")
+	m.ConnInputs[6].SetValue("credentials.redis.username")
+	m.ConnInputs[7].SetValue("credentials.redis.password")
+	m.ConnInputs[8].SetValue("5")
 	m.ConnClusterMode = true
 	m.ConnFocusIdx = 3
 
@@ -252,6 +267,9 @@ func TestModel_ConvertCurrentInputsToConnection_Add(t *testing.T) {
 	if conn.Password != "secret" {
 		t.Errorf("Password = %q, want %q", conn.Password, "secret")
 	}
+	if conn.VaultPath != "secret/data/redis" || conn.VaultUserKey != "credentials.redis.username" || conn.VaultPasswordKey != "credentials.redis.password" {
+		t.Errorf("Vault reference = %q/%q/%q", conn.VaultPath, conn.VaultUserKey, conn.VaultPasswordKey)
+	}
 	if conn.DB != 5 {
 		t.Errorf("DB = %d, want %d", conn.DB, 5)
 	}
@@ -270,7 +288,10 @@ func TestModel_ConvertCurrentInputsToConnection_Edit(t *testing.T) {
 	m.ConnInputs[2].SetValue("6380")
 	m.ConnInputs[3].SetValue("user")
 	m.ConnInputs[4].SetValue("secret")
-	m.ConnInputs[5].SetValue("5")
+	m.ConnInputs[5].SetValue("secret/data/redis")
+	m.ConnInputs[6].SetValue("credentials.redis.username")
+	m.ConnInputs[7].SetValue("credentials.redis.password")
+	m.ConnInputs[8].SetValue("5")
 	m.ConnClusterMode = true
 	m.ConnFocusIdx = 3
 
@@ -291,6 +312,9 @@ func TestModel_ConvertCurrentInputsToConnection_Edit(t *testing.T) {
 	}
 	if conn.Password != "secret" {
 		t.Errorf("Password = %q, want %q", conn.Password, "secret")
+	}
+	if conn.VaultPath != "secret/data/redis" || conn.VaultUserKey != "credentials.redis.username" || conn.VaultPasswordKey != "credentials.redis.password" {
+		t.Errorf("Vault reference = %q/%q/%q", conn.VaultPath, conn.VaultUserKey, conn.VaultPasswordKey)
 	}
 	if conn.DB != 5 {
 		t.Errorf("DB = %d, want %d", conn.DB, 5)

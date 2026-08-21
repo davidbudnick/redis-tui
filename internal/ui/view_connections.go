@@ -303,12 +303,12 @@ func (m Model) viewEditConnection() string {
 	return lipgloss.Place(m.Width, m.Height, lipgloss.Center, lipgloss.Center, modalStyle.Render(b.String()))
 }
 
-// renderConnForm renders the shared connection form fields (name, host, port, username, password, cluster toggle, database).
+// renderConnForm renders the shared connection form fields.
 func (m Model) renderConnForm() string {
 	var b strings.Builder
 
-	// Fields 0-4: Name, Host, Port, Username, Password (text inputs)
-	textLabels := []string{"Name", "Host", "Port", "Username", "Password"}
+	// Fields 0-7: connection and credential inputs.
+	textLabels := []string{"Name", "Host", "Port", "Username", "Password", "Vault Path", "Vault Username Key", "Vault Password Key"}
 	for i := range textLabels {
 		labelStyle := keyStyle
 		if m.ConnFocusIdx == i {
@@ -320,7 +320,7 @@ func (m Model) renderConnForm() string {
 		b.WriteString("\n\n")
 	}
 
-	// Field 5: Cluster toggle
+	// Field 8: Cluster toggle
 	clusterLabelStyle := keyStyle
 	if m.ConnFocusIdx == len(textLabels) {
 		clusterLabelStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
@@ -338,7 +338,7 @@ func (m Model) renderConnForm() string {
 	b.WriteString(checkboxStyle.Render(checkbox))
 	b.WriteString("\n\n")
 
-	// Field 6: Database (only when not in cluster mode)
+	// Field 9: Database (only when not in cluster mode)
 	if !m.ConnClusterMode {
 		dbLabelStyle := keyStyle
 		if m.ConnFocusIdx == len(textLabels)+1 {
@@ -346,7 +346,7 @@ func (m Model) renderConnForm() string {
 		}
 		b.WriteString(dbLabelStyle.Render("Database:"))
 		b.WriteString("\n")
-		b.WriteString(m.ConnInputs[5].View())
+		b.WriteString(m.ConnInputs[8].View())
 		b.WriteString("\n\n")
 	}
 

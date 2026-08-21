@@ -14,7 +14,7 @@ import (
 func TestConfig_Persistence_AllConnectionFields(t *testing.T) {
 	cfg := newTestConfig(t)
 
-	conn, err := cfg.AddConnection(types.Connection{Name: "prod-redis", Host: "redis.example.com", Username: "default", Port: 6380, DB: 2, UseCluster: true})
+	conn, err := cfg.AddConnection(types.Connection{Name: "prod-redis", Host: "redis.example.com", Username: "default", Port: 6380, VaultPath: "secret/data/redis/prod", VaultUserKey: "credentials.redis.username", VaultPasswordKey: "credentials.redis.password", DB: 2, UseCluster: true})
 	if err != nil {
 		t.Fatalf("AddConnection failed: %v", err)
 	}
@@ -43,6 +43,15 @@ func TestConfig_Persistence_AllConnectionFields(t *testing.T) {
 	}
 	if got.Username != "default" {
 		t.Errorf("Username = %q, want %q", got.Username, "default")
+	}
+	if got.VaultPath != "secret/data/redis/prod" {
+		t.Errorf("VaultPath = %q, want %q", got.VaultPath, "secret/data/redis/prod")
+	}
+	if got.VaultUserKey != "credentials.redis.username" {
+		t.Errorf("VaultUserKey = %q, want %q", got.VaultUserKey, "credentials.redis.username")
+	}
+	if got.VaultPasswordKey != "credentials.redis.password" {
+		t.Errorf("VaultPasswordKey = %q, want %q", got.VaultPasswordKey, "credentials.redis.password")
 	}
 	if got.DB != 2 {
 		t.Errorf("DB = %d, want %d", got.DB, 2)

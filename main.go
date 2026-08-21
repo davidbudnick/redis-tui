@@ -119,6 +119,9 @@ func parseFlags(args []string) (conn *types.Connection, showVersion bool, doUpda
 	port := fs.Int("port", 6379, "Redis server port")
 	username := fs.String("user", "", "Redis username (for ACL-enabled servers)")
 	password := fs.String("password", "", "Redis password")
+	vaultPath := fs.String("vault-path", "", "Vault logical path containing Redis credentials")
+	vaultUserKey := fs.String("vault-username-key", "", "Vault key selector containing the Redis username")
+	vaultPasswordKey := fs.String("vault-password-key", "", "Vault key selector containing the Redis password")
 	dbNum := fs.Int("db", 0, "Redis database number (0-15)")
 	name := fs.String("name", "", "Connection display name")
 	cluster := fs.Bool("cluster", false, "Enable cluster mode")
@@ -145,6 +148,9 @@ func parseFlags(args []string) (conn *types.Connection, showVersion bool, doUpda
 		fmt.Fprintf(os.Stderr, "  -h, --host string       Redis server hostname (required for quick-connect)\n")
 		fmt.Fprintf(os.Stderr, "  -p, --port int          Redis server port (default 6379)\n")
 		fmt.Fprintf(os.Stderr, "  -a, --password string   Redis password\n")
+		fmt.Fprintf(os.Stderr, "      --vault-path string Vault logical path containing Redis credentials\n")
+		fmt.Fprintf(os.Stderr, "      --vault-username-key string Vault key selector containing the Redis username\n")
+		fmt.Fprintf(os.Stderr, "      --vault-password-key string Vault key selector containing the Redis password\n")
 		fmt.Fprintf(os.Stderr, "  -n, --db int            Redis database number, 0-15 (default 0)\n")
 		fmt.Fprintf(os.Stderr, "      --user string       Redis username (for ACL-enabled servers)\n")
 		fmt.Fprintf(os.Stderr, "      --name string       Connection display name\n")
@@ -185,12 +191,15 @@ func parseFlags(args []string) (conn *types.Connection, showVersion bool, doUpda
 	})
 
 	conn = &types.Connection{
-		Host:       *host,
-		Port:       *port,
-		Username:   *username,
-		Password:   *password,
-		DB:         *dbNum,
-		UseCluster: *cluster,
+		Host:             *host,
+		Port:             *port,
+		Username:         *username,
+		Password:         *password,
+		VaultPath:        *vaultPath,
+		VaultUserKey:     *vaultUserKey,
+		VaultPasswordKey: *vaultPasswordKey,
+		DB:               *dbNum,
+		UseCluster:       *cluster,
 	}
 
 	if *name != "" {
