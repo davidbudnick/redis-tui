@@ -1,7 +1,9 @@
 package redis
 
 import (
+	"context"
 	"crypto/tls"
+	"errors"
 	"strconv"
 	"strings"
 	"testing"
@@ -10,6 +12,107 @@ import (
 	"github.com/davidbudnick/redis-tui/internal/testutil"
 	"github.com/davidbudnick/redis-tui/internal/types"
 )
+
+type stubPasswordResolver struct {
+	values    map[string]string
+	err       error
+	path      string
+	selectors []string
+}
+
+func (r *stubPasswordResolver) Resolve(_ context.Context, path string, selectors ...string) (map[string]string, error) {
+	r.path = path
+	r.selectors = selectors
+	return r.values, r.err
+}
+
+func TestResolveCredentials(t *testing.T) {
+	client := NewClient()
+
+	plain := types.Connection{Password: "literal"}
+	got, err := client.resolveCredentials(plain)
+	if err != nil || got.Password != "literal" {
+		t.Fatalf("plain password resolution = %#v, %v", got, err)
+	}
+
+	if _, err := client.resolveCredentials(types.Connection{VaultPasswordKey: "password"}); err == nil {
+		t.Fatal("expected missing Vault path error")
+	}
+	if _, err := client.resolveCredentials(types.Connection{VaultPath: "secret/data/redis"}); err == nil {
+		t.Fatal("expected missing Vault key error")
+	}
+
+	userKey := "credentials.VALKEY.username"
+	passwordKey := "credentials.VALKEY.password"
+	resolver := &stubPasswordResolver{values: map[string]string{userKey: "from-vault-user", passwordKey: "from-vault"}}
+	client.credentials = resolver
+	got, err = client.resolveCredentials(types.Connection{Username: "ignored", Password: "ignored", VaultPath: "secret/data/redis", VaultUserKey: userKey, VaultPasswordKey: passwordKey})
+	if err != nil {
+		t.Fatalf("resolveCredentials() error = %v", err)
+	}
+	if got.Username != "from-vault-user" {
+		t.Errorf("Username = %q, want %q", got.Username, "from-vault-user")
+	}
+	if got.Password != "from-vault" {
+		t.Errorf("Password = %q, want %q", got.Password, "from-vault")
+	}
+	if resolver.path != "secret/data/redis" || len(resolver.selectors) != 2 || resolver.selectors[0] != userKey || resolver.selectors[1] != passwordKey {
+		t.Errorf("resolver called with path %q and selectors %v", resolver.path, resolver.selectors)
+	}
+
+	client.credentials = &stubPasswordResolver{err: errors.New("Vault unavailable")}
+	if _, err := client.resolveCredentials(types.Connection{VaultPath: "secret/data/redis", VaultPasswordKey: "password"}); err == nil || !strings.Contains(err.Error(), "resolve Redis credentials from Vault") {
+		t.Fatalf("resolveCredentials() error = %v", err)
+	}
+
+	resolver = &stubPasswordResolver{values: map[string]string{userKey: "user-only"}}
+	client.credentials = resolver
+	got, err = client.resolveCredentials(types.Connection{Password: "literal", VaultPath: "secret/data/redis", VaultUserKey: userKey})
+	if err != nil || got.Username != "user-only" || got.Password != "literal" {
+		t.Fatalf("username-only resolution = %#v, %v", got, err)
+	}
+}
+
+func TestVaultPasswordConnectionFlows(t *testing.T) {
+	resolverErr := errors.New("Vault unavailable")
+	conn := types.Connection{Host: "localhost", Port: 6379, VaultPath: "secret/data/redis", VaultPasswordKey: "password"}
+
+	client := NewClient()
+	client.credentials = &stubPasswordResolver{err: resolverErr}
+	if err := client.Connect(conn); !errors.Is(err, resolverErr) {
+		t.Errorf("Connect() error = %v, want resolver error", err)
+	}
+	if err := client.ConnectCluster([]string{"localhost:6379"}, conn); !errors.Is(err, resolverErr) {
+		t.Errorf("ConnectCluster() error = %v, want resolver error", err)
+	}
+	if _, err := client.TestConnection(conn); !errors.Is(err, resolverErr) {
+		t.Errorf("TestConnection() error = %v, want resolver error", err)
+	}
+
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("failed to start miniredis: %v", err)
+	}
+	t.Cleanup(mr.Close)
+	mr.RequireAuth("from-vault")
+	port, err := strconv.Atoi(mr.Port())
+	if err != nil {
+		t.Fatalf("parse miniredis port: %v", err)
+	}
+
+	client = NewClient()
+	client.credentials = &stubPasswordResolver{values: map[string]string{"password": "from-vault"}}
+	conn.Host = mr.Host()
+	conn.Port = port
+	if err := client.Connect(conn); err != nil {
+		t.Fatalf("Connect() with Vault password error = %v", err)
+	}
+	t.Cleanup(func() {
+		if err := client.Disconnect(); err != nil {
+			t.Errorf("Disconnect() error = %v", err)
+		}
+	})
+}
 
 func TestParseAddr(t *testing.T) {
 	tests := []struct {

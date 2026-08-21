@@ -153,6 +153,13 @@ redis-tui --host localhost
 # Connect with password and specific database
 redis-tui -h redis.example.com -p 6380 -a mypassword -n 2
 
+# Resolve the password from HashiCorp Vault
+VAULT_ADDR=https://vault.example.com VAULT_TOKEN=... redis-tui \
+  --host redis.example.com \
+  --vault-path secret/data/redis/prod \
+  --vault-username-key credentials.redis.username \
+  --vault-password-key credentials.redis.password
+
 # Connect to a cluster node
 redis-tui --host redis.example.com --port 6380 --cluster
 
@@ -186,6 +193,9 @@ Press `?` inside the app to view the full help screen.
 | `--host`            | `-h`  | Redis server hostname                               |             |
 | `--port`            | `-p`  | Redis server port                                   | 6379        |
 | `--password`        | `-a`  | Redis password                                      |             |
+| `--vault-path`      |       | Vault logical path containing Redis credentials     |             |
+| `--vault-username-key` |    | Key selector containing the Redis username          |             |
+| `--vault-password-key` |    | Key selector containing the Redis password          |             |
 | `--db`              | `-n`  | Database number (0-15)                              | 0           |
 | `--user`            |       | Redis username (For ACL enabled servers)            |             |
 | `--name`            |       | Connection display name                             | `host:port` |
@@ -311,6 +321,9 @@ Configuration is stored in `~/.config/redis-tui/config.json`.
       "host": "localhost",
       "port": 6379,
       "username": "default",
+      "vault_path": "secret/data/redis/standalone",
+      "vault_username_key": "credentials.redis.username",
+      "vault_password_key": "credentials.redis.password",
       "db": 0,
       "created_at": "2025-01-01T00:00:00Z",
       "updated_at": "2025-01-01T00:00:00Z"
@@ -400,6 +413,12 @@ Configuration is stored in `~/.config/redis-tui/config.json`.
 
 > **Note:** Passwords and SSH passphrases are never saved to the config file. They are stripped before serialization for security. The config file is written with `0600` permissions (owner read/write only).
 
+### HashiCorp Vault passwords
+
+The interactive connection form and CLI quick-connect mode accept a Vault path plus username and password key selectors. redis-tui uses HashiCorp's official [`github.com/hashicorp/vault/api`](https://pkg.go.dev/github.com/hashicorp/vault/api) client and its standard environment variables, including `VAULT_ADDR`, `VAULT_TOKEN`, `VAULT_NAMESPACE`, `VAULT_CACERT`, and `VAULT_CLIENT_CERT`/`VAULT_CLIENT_KEY`. When `VAULT_TOKEN` is unset, redis-tui also uses the official Vault CLI token helper configuration, including the default `~/.vault-token` file.
+
+Use the full logical API path without the `/v1/` prefix. For KV v2 this includes `data/`, such as `secret/data/redis/prod`; for KV v1 it may be `secret/redis/prod`. KV v2 response data is unwrapped automatically. Dot-separated selectors traverse nested maps, so `credentials.redis.password` selects `password` inside `redis` inside `credentials`. A `vault_path` and at least one of `vault_username_key` or `vault_password_key` are required. Vault values take precedence over literal username/password values.
+
 > **TTL format:** `default_ttl` values in templates use Go's `time.Duration` nanosecond encoding: 1s = `1000000000`, 1m = `60000000000`, 1h = `3600000000000`.
 
 > **Reserved / planned fields:** `groups`, `group`, `use_ssh`, `ssh_config`, and `watch_interval_ms` are kept for forward compatibility. SSH tunneling, connection-group UI, and functional watch mode are not implemented yet (see [Coming soon / roadmap](#coming-soon--roadmap)).
@@ -412,6 +431,9 @@ Configuration is stored in `~/.config/redis-tui/config.json`.
 | `host`                            | Redis server hostname or IP                                 |
 | `port`                            | Redis server port (default: 6379)                           |
 | `password`                        | Redis password (never saved to disk)                        |
+| `vault_path`                      | Full Vault logical path containing Redis credentials         |
+| `vault_username_key`              | Dot-separated selector for the Redis username               |
+| `vault_password_key`              | Dot-separated selector for the Redis password               |
 | `db`                              | Redis database number (0-15)                                |
 | `username`                        | Redis ACL username (optional)                               |
 | `group`                           | Connection group name (optional; UI not wired yet)          |

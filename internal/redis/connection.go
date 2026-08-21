@@ -45,6 +45,37 @@ func defaultOptions(conn types.Connection) (*redis.Options, error) {
 	}, nil
 }
 
+func (c *Client) resolveCredentials(conn types.Connection) (types.Connection, error) {
+	if conn.VaultPath == "" && conn.VaultUserKey == "" && conn.VaultPasswordKey == "" {
+		return conn, nil
+	}
+	if conn.VaultPath == "" {
+		return types.Connection{}, errors.New("Vault path is required when using Vault credential keys")
+	}
+	if conn.VaultUserKey == "" && conn.VaultPasswordKey == "" {
+		return types.Connection{}, errors.New("at least one Vault username or password key is required")
+	}
+
+	selectors := make([]string, 0, 2)
+	if conn.VaultUserKey != "" {
+		selectors = append(selectors, conn.VaultUserKey)
+	}
+	if conn.VaultPasswordKey != "" {
+		selectors = append(selectors, conn.VaultPasswordKey)
+	}
+	values, err := c.credentials.Resolve(c.ctx, conn.VaultPath, selectors...)
+	if err != nil {
+		return types.Connection{}, fmt.Errorf("resolve Redis credentials from Vault: %w", err)
+	}
+	if conn.VaultUserKey != "" {
+		conn.Username = values[conn.VaultUserKey]
+	}
+	if conn.VaultPasswordKey != "" {
+		conn.Password = values[conn.VaultPasswordKey]
+	}
+	return conn, nil
+}
+
 // cleanup closes existing connections before establishing a new one
 func (c *Client) cleanup() {
 	c.mu.Lock()
@@ -55,6 +86,11 @@ func (c *Client) cleanup() {
 // Connect establishes a connection to Redis
 func (c *Client) Connect(conn types.Connection) error {
 	c.cleanup()
+	var err error
+	conn, err = c.resolveCredentials(conn)
+	if err != nil {
+		return err
+	}
 
 	opts, optErr := defaultOptions(conn)
 	if optErr != nil {
@@ -86,13 +122,18 @@ func (c *Client) Connect(conn types.Connection) error {
 	pingCtx, cancel := context.WithTimeout(ctx, defaultPingTimeout)
 	defer cancel()
 
-	_, err := client.Ping(pingCtx).Result()
+	_, err = client.Ping(pingCtx).Result()
 	return err
 }
 
 // ConnectCluster establishes a connection to a Redis cluster
 func (c *Client) ConnectCluster(addrs []string, conn types.Connection) error {
 	c.cleanup()
+	var err error
+	conn, err = c.resolveCredentials(conn)
+	if err != nil {
+		return err
+	}
 
 	// Parse first address for display purposes and for the Dialer below.
 	seedHost := "127.0.0.1"
@@ -152,7 +193,7 @@ func (c *Client) ConnectCluster(addrs []string, conn types.Connection) error {
 	pingCtx, cancel := context.WithTimeout(ctx, defaultPingTimeout)
 	defer cancel()
 
-	_, err := cluster.Ping(pingCtx).Result()
+	_, err = cluster.Ping(pingCtx).Result()
 	return err
 }
 
@@ -235,6 +276,11 @@ func (c *Client) SelectDB(db int) error {
 
 // TestConnection tests a connection
 func (c *Client) TestConnection(conn types.Connection) (time.Duration, error) {
+	var err error
+	conn, err = c.resolveCredentials(conn)
+	if err != nil {
+		return 0, err
+	}
 	opts, optErr := defaultOptions(conn)
 	if optErr != nil {
 		return 0, optErr
@@ -257,6 +303,6 @@ func (c *Client) TestConnection(conn types.Connection) (time.Duration, error) {
 	ctx, cancel := context.WithTimeout(c.ctx, defaultPingTimeout)
 	defer cancel()
 
-	_, err := testClient.Ping(ctx).Result()
+	_, err = testClient.Ping(ctx).Result()
 	return time.Since(start), err
 }

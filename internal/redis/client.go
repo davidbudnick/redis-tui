@@ -5,8 +5,13 @@ import (
 	"sync"
 
 	"github.com/davidbudnick/redis-tui/internal/types"
+	redisvault "github.com/davidbudnick/redis-tui/internal/vault"
 	"github.com/redis/go-redis/v9"
 )
+
+type credentialResolver interface {
+	Resolve(ctx context.Context, path string, selectors ...string) (map[string]string, error)
+}
 
 // silentLogger discards all log output from the Redis client
 type silentLogger struct{}
@@ -39,6 +44,7 @@ type Client struct {
 	keyspacePS     *redis.PubSub
 	eventHandlers  []func(types.KeyspaceEvent)
 	cancelKeyspace context.CancelFunc
+	credentials    credentialResolver
 }
 
 func (c *Client) cmdable() redis.Cmdable {
@@ -197,6 +203,7 @@ func NewClient() *Client {
 		ctx:           context.Background(),
 		includeTypes:  true,
 		eventHandlers: []func(types.KeyspaceEvent){},
+		credentials:   redisvault.NewResolver(),
 	}
 }
 

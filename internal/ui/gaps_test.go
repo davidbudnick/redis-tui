@@ -70,12 +70,12 @@ func TestHandleRedisConfigScreen_Down(t *testing.T) {
 
 func TestHandleAddConnectionScreen_ClusterFocusOverflow(t *testing.T) {
 	m, _, _ := newTestModel(t)
-	// Put focus past what cluster mode allows (DB field at idx 5)
-	m.ConnFocusIdx = 6
+	// Put focus past what cluster mode allows (DB field at idx 9)
+	m.ConnFocusIdx = 9
 	m.ConnClusterMode = false
 	// First toggle cluster on at idx 4 scenario: manually create a state where
 	// after toggling, focus idx >= connFieldCount
-	m.ConnFocusIdx = 5
+	m.ConnFocusIdx = 8
 	_, _ = m.handleAddConnectionScreen(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
 	// Now cluster is on — re-toggle with focus still valid
 	m.ConnClusterMode = true // m is a val, not a pointer, so we need to manually flip
@@ -86,8 +86,7 @@ func TestHandleAddConnectionScreen_ClusterFocusOverflow(t *testing.T) {
 
 func TestUpdateConnInputs_ClusterToggleFocus(t *testing.T) {
 	m, _, _ := newTestModel(t)
-	m.ConnFocusIdx = 5                   // cluster toggle — no text input
-	m.ConnInputs[m.ConnFocusIdx].Focus() // Needs to be focused for Update to return a cmd
+	m.ConnFocusIdx = 8 // cluster toggle — no text input
 	_, cmd := m.updateConnInputs(keyMsg('x'))
 	if cmd != nil {
 		t.Error("expected nil cmd when focus on cluster toggle")
@@ -110,7 +109,7 @@ func TestUpdateConnInputs_NotCluster(t *testing.T) {
 
 func TestHandleEditConnectionScreen_ClusterFocusOverflow(t *testing.T) {
 	m, _, _ := newTestModel(t)
-	m.ConnFocusIdx = 4
+	m.ConnFocusIdx = 8
 	_, _ = m.handleEditConnectionScreen(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
 }
 

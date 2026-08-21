@@ -77,7 +77,7 @@ func TestParseFlags_ShortFlags(t *testing.T) {
 }
 
 func TestParseFlags_LongFlags(t *testing.T) {
-	conn, _, _, _, _, err := parseFlags([]string{"--host", "10.0.0.1", "--port", "7000", "--user", "user", "--password", "pass", "--db", "3"})
+	conn, _, _, _, _, err := parseFlags([]string{"--host", "10.0.0.1", "--port", "7000", "--user", "user", "--password", "pass", "--vault-path", "secret/data/redis", "--vault-username-key", "credentials.redis.username", "--vault-password-key", "credentials.redis.password", "--db", "3"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -95,6 +95,9 @@ func TestParseFlags_LongFlags(t *testing.T) {
 	}
 	if conn.Password != "pass" {
 		t.Errorf("Password = %q, want %q", conn.Password, "pass")
+	}
+	if conn.VaultPath != "secret/data/redis" || conn.VaultUserKey != "credentials.redis.username" || conn.VaultPasswordKey != "credentials.redis.password" {
+		t.Errorf("Vault reference = %q/%q/%q", conn.VaultPath, conn.VaultUserKey, conn.VaultPasswordKey)
 	}
 	if conn.DB != 3 {
 		t.Errorf("DB = %d, want %d", conn.DB, 3)

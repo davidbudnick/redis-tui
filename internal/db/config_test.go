@@ -160,6 +160,9 @@ func TestConfig_UpdateConnection(t *testing.T) {
 	conn.Port = 6380
 	conn.Username = "newuser"
 	conn.Password = "new"
+	conn.VaultPath = "secret/data/redis"
+	conn.VaultUserKey = "credentials.redis.username"
+	conn.VaultPasswordKey = "credentials.redis.password"
 	conn.DB = 1
 
 	updated, err := cfg.UpdateConnection(conn)
@@ -181,6 +184,9 @@ func TestConfig_UpdateConnection(t *testing.T) {
 	}
 	if updated.Password != "new" {
 		t.Errorf("Password = %q, want \"new\"", updated.Password)
+	}
+	if updated.VaultPath != "secret/data/redis" || updated.VaultUserKey != "credentials.redis.username" || updated.VaultPasswordKey != "credentials.redis.password" {
+		t.Errorf("Vault reference = %q/%q/%q", updated.VaultPath, updated.VaultUserKey, updated.VaultPasswordKey)
 	}
 	if updated.DB != 1 {
 		t.Errorf("DB = %d, want 1", updated.DB)

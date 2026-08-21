@@ -66,13 +66,13 @@ func (m Model) handleAddConnectionScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 		}
 		m.focusConnField()
 	case "space":
-		if m.ConnFocusIdx == 5 {
+		if m.ConnFocusIdx == 8 {
 			m.ConnClusterMode = !m.ConnClusterMode
 			return m, nil
 		}
 		return m.updateConnInputs(msg)
 	case "enter":
-		if m.ConnFocusIdx == 5 {
+		if m.ConnFocusIdx == 8 {
 			m.ConnClusterMode = !m.ConnClusterMode
 			return m, nil
 		}
@@ -100,14 +100,14 @@ func (m Model) handleAddConnectionScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 }
 
 // connInputIndex maps a ConnFocusIdx to the actual ConnInputs array index.
-// Indices 0-4 map directly to ConnInputs[0-4], index 5 is the cluster toggle (no input),
-// and index 6 maps to ConnInputs[5] (Database).
+// Indices 0-7 map directly to ConnInputs[0-7], index 8 is the cluster toggle,
+// and index 9 maps to ConnInputs[8] (Database).
 func connInputIndex(focusIdx int) int {
-	if focusIdx <= 4 {
+	if focusIdx <= 7 {
 		return focusIdx
 	}
-	if focusIdx == 6 {
-		return 5 // Database input
+	if focusIdx == 9 {
+		return 8 // Database input
 	}
 	return -1 // cluster toggle, no text input
 }
@@ -153,13 +153,13 @@ func (m Model) handleEditConnectionScreen(msg tea.KeyPressMsg) (tea.Model, tea.C
 		}
 		m.focusConnField()
 	case "space":
-		if m.ConnFocusIdx == 5 {
+		if m.ConnFocusIdx == 8 {
 			m.ConnClusterMode = !m.ConnClusterMode
 			return m, nil
 		}
 		return m.updateConnInputs(msg)
 	case "enter":
-		if m.ConnFocusIdx == 5 {
+		if m.ConnFocusIdx == 8 {
 			m.ConnClusterMode = !m.ConnClusterMode
 			return m, nil
 		}

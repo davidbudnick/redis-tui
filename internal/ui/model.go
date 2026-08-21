@@ -266,7 +266,7 @@ func createTextInput(placeholder string, width int) textinput.Model {
 }
 
 func createConnectionInputs() []textinput.Model {
-	inputs := make([]textinput.Model, 6)
+	inputs := make([]textinput.Model, 9)
 
 	inputs[0] = textinput.New()
 	inputs[0].Placeholder = "Connection Name"
@@ -294,9 +294,21 @@ func createConnectionInputs() []textinput.Model {
 	inputs[4].EchoMode = textinput.EchoPassword
 
 	inputs[5] = textinput.New()
-	inputs[5].Placeholder = "Database (0-15)"
+	inputs[5].Placeholder = "Vault path (optional)"
 	inputs[5].SetWidth(30)
-	inputs[5].SetValue("0")
+
+	inputs[6] = textinput.New()
+	inputs[6].Placeholder = "Vault username key (optional)"
+	inputs[6].SetWidth(30)
+
+	inputs[7] = textinput.New()
+	inputs[7].Placeholder = "Vault password key (optional)"
+	inputs[7].SetWidth(30)
+
+	inputs[8] = textinput.New()
+	inputs[8].Placeholder = "Database (0-15)"
+	inputs[8].SetWidth(30)
+	inputs[8].SetValue("0")
 
 	return inputs
 }
@@ -375,7 +387,7 @@ func (m Model) getPort() int {
 }
 
 func (m Model) getDB() int {
-	db, err := strconv.Atoi(m.ConnInputs[5].Value())
+	db, err := strconv.Atoi(m.ConnInputs[8].Value())
 	if err != nil {
 		return 0
 	}
@@ -389,7 +401,7 @@ func (m *Model) resetConnInputs() {
 	}
 	m.ConnInputs[1].SetValue("localhost")
 	m.ConnInputs[2].SetValue("6379")
-	m.ConnInputs[5].SetValue("0")
+	m.ConnInputs[8].SetValue("0")
 	m.ConnInputs[0].Focus()
 	m.ConnFocusIdx = 0
 	m.ConnClusterMode = false
@@ -413,7 +425,10 @@ func (m *Model) populateConnInputs(conn types.Connection) {
 	m.ConnInputs[2].SetValue(strconv.Itoa(conn.Port))
 	m.ConnInputs[3].SetValue(conn.Username)
 	m.ConnInputs[4].SetValue(conn.Password)
-	m.ConnInputs[5].SetValue(strconv.Itoa(conn.DB))
+	m.ConnInputs[5].SetValue(conn.VaultPath)
+	m.ConnInputs[6].SetValue(conn.VaultUserKey)
+	m.ConnInputs[7].SetValue(conn.VaultPasswordKey)
+	m.ConnInputs[8].SetValue(strconv.Itoa(conn.DB))
 	m.ConnClusterMode = conn.UseCluster
 }
 
@@ -425,27 +440,29 @@ func (m *Model) convertCurrentInputsToConnection(inputs []textinput.Model, actio
 	}
 
 	port, _ := strconv.Atoi(inputs[2].Value())
-	db, _ := strconv.Atoi(inputs[5].Value())
+	db, _ := strconv.Atoi(inputs[8].Value())
 	return types.Connection{
-		ID:         id,
-		Name:       inputs[0].Value(),
-		Port:       port,
-		Host:       inputs[1].Value(),
-		Username:   inputs[3].Value(),
-		Password:   inputs[4].Value(),
-		DB:         db,
-		UseCluster: m.ConnClusterMode,
+		ID:               id,
+		Name:             inputs[0].Value(),
+		Port:             port,
+		Host:             inputs[1].Value(),
+		Username:         inputs[3].Value(),
+		Password:         inputs[4].Value(),
+		VaultPath:        inputs[5].Value(),
+		VaultUserKey:     inputs[6].Value(),
+		VaultPasswordKey: inputs[7].Value(),
+		DB:               db,
+		UseCluster:       m.ConnClusterMode,
 	}
 }
 
 // connFieldCount returns the number of focusable fields in the connection form.
-// When cluster mode is on, the DB field is skipped (6 fields: name, host, port, username, password, cluster toggle).
-// Otherwise there are 7 fields: name, host, port, username, password, cluster toggle, database.
+// When cluster mode is on, the DB field is skipped.
 func (m Model) connFieldCount() int {
 	if m.ConnClusterMode {
-		return 6
+		return 9
 	}
-	return 7
+	return 10
 }
 
 func (m *Model) resetAddCollectionInputs() {
