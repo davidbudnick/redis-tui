@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/davidbudnick/redis-tui/internal/testutil"
@@ -752,4 +753,18 @@ func TestSelectDB_SelectError(t *testing.T) {
 	if err := c.SelectDB(2); err == nil {
 		t.Error("expected error from SelectDB when SELECT errors")
 	}
+}
+
+func TestElapsedSince(t *testing.T) {
+	t.Run("floors zero and negative to 1ns", func(t *testing.T) {
+		if got := elapsedSince(time.Now().Add(time.Hour)); got != time.Nanosecond {
+			t.Errorf("elapsedSince(future) = %v, want 1ns", got)
+		}
+	})
+	t.Run("preserves positive duration", func(t *testing.T) {
+		got := elapsedSince(time.Now().Add(-50 * time.Millisecond))
+		if got < 50*time.Millisecond {
+			t.Errorf("elapsedSince(past) = %v, want >= 50ms", got)
+		}
+	})
 }

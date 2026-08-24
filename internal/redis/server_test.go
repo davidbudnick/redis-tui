@@ -247,9 +247,7 @@ func TestTestConnection(t *testing.T) {
 		if err != nil {
 			t.Fatalf("TestConnection() error = %v", err)
 		}
-		if latency <= 0 {
-			t.Errorf("TestConnection() latency = %v, want > 0", latency)
-		}
+		assertMeasuredLatency(t, latency)
 	})
 
 	t.Run("successful connection with username / password returns latency", func(t *testing.T) {
@@ -264,9 +262,7 @@ func TestTestConnection(t *testing.T) {
 		if err != nil {
 			t.Fatalf("TestConnection() error = %v", err)
 		}
-		if latency <= 0 {
-			t.Errorf("TestConnection() latency = %v, want > 0", latency)
-		}
+		assertMeasuredLatency(t, latency)
 	})
 
 	t.Run("wrong username / password returns error", func(t *testing.T) {
@@ -385,9 +381,7 @@ func TestTestConnection(t *testing.T) {
 			t.Fatalf("Connect() with TLS returned error: %v", err)
 		}
 		t.Cleanup(func() { _ = client.Disconnect() })
-		if latency <= 0 {
-			t.Errorf("TestConnection() latency = %v, want > 0", latency)
-		}
+		assertMeasuredLatency(t, latency)
 	})
 
 	t.Run("TLS requested but config is missing", func(t *testing.T) {
