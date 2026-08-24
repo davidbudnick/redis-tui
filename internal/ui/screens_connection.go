@@ -66,14 +66,12 @@ func (m Model) handleAddConnectionScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 		}
 		m.focusConnField()
 	case "space":
-		if m.ConnFocusIdx == 8 {
-			m.ConnClusterMode = !m.ConnClusterMode
+		if m.toggleConnCheckbox() {
 			return m, nil
 		}
 		return m.updateConnInputs(msg)
 	case "enter":
-		if m.ConnFocusIdx == 8 {
-			m.ConnClusterMode = !m.ConnClusterMode
+		if m.toggleConnCheckbox() {
 			return m, nil
 		}
 		if m.ConnInputs[0].Value() != "" && m.ConnInputs[1].Value() != "" {
@@ -99,36 +97,59 @@ func (m Model) handleAddConnectionScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cm
 	return m, nil
 }
 
-// connInputIndex maps a ConnFocusIdx to the actual ConnInputs array index.
-// Indices 0-7 map directly to ConnInputs[0-7], index 8 is the cluster toggle,
-// and index 9 maps to ConnInputs[8] (Database).
-func connInputIndex(focusIdx int) int {
-	if focusIdx <= 7 {
+// connVaultToggleIdx is the focus index of the vault checkbox, right after the Password field.
+const connVaultToggleIdx = 5
+
+// connInputIndex maps a ConnFocusIdx to the ConnInputs array index, or -1 for a checkbox.
+func (m Model) connInputIndex(focusIdx int) int {
+	if focusIdx <= 4 {
 		return focusIdx
 	}
-	if focusIdx == 9 {
-		return 8 // Database input
+	if m.ConnUseVault {
+		if focusIdx >= 6 && focusIdx <= 8 {
+			return focusIdx - 1
+		}
+		if focusIdx == 10 {
+			return 8
+		}
+		return -1
 	}
-	return -1 // cluster toggle, no text input
+	if focusIdx == 7 {
+		return 8
+	}
+	return -1
+}
+
+// toggleConnCheckbox flips the vault or cluster checkbox when one is focused, reporting whether it handled the key.
+func (m *Model) toggleConnCheckbox() bool {
+	switch m.ConnFocusIdx {
+	case connVaultToggleIdx:
+		m.ConnUseVault = !m.ConnUseVault
+		return true
+	case m.connClusterToggleIdx():
+		m.ConnClusterMode = !m.ConnClusterMode
+		return true
+	}
+	return false
 }
 
 func (m *Model) blurConnField() {
-	idx := connInputIndex(m.ConnFocusIdx)
+	idx := m.connInputIndex(m.ConnFocusIdx)
 	if idx >= 0 && idx < len(m.ConnInputs) {
 		m.ConnInputs[idx].Blur()
 	}
 }
 
 func (m *Model) focusConnField() {
-	idx := connInputIndex(m.ConnFocusIdx)
+	idx := m.connInputIndex(m.ConnFocusIdx)
 	if idx >= 0 && idx < len(m.ConnInputs) {
 		m.ConnInputs[idx].Focus()
 	}
 }
 
 func (m Model) updateConnInputs(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	// Only update the focused text input, not the cluster toggle
-	idx := connInputIndex(m.ConnFocusIdx)
+	// Only update the focused text input, not the checkboxes
+	idx := m.connInputIndex(m.ConnFocusIdx)
 	if idx >= 0 && idx < len(m.ConnInputs) {
 		var inputCmd tea.Cmd
 		m.ConnInputs[idx], inputCmd = m.ConnInputs[idx].Update(msg)
@@ -153,14 +174,12 @@ func (m Model) handleEditConnectionScreen(msg tea.KeyPressMsg) (tea.Model, tea.C
 		}
 		m.focusConnField()
 	case "space":
-		if m.ConnFocusIdx == 8 {
-			m.ConnClusterMode = !m.ConnClusterMode
+		if m.toggleConnCheckbox() {
 			return m, nil
 		}
 		return m.updateConnInputs(msg)
 	case "enter":
-		if m.ConnFocusIdx == 8 {
-			m.ConnClusterMode = !m.ConnClusterMode
+		if m.toggleConnCheckbox() {
 			return m, nil
 		}
 		if m.EditingConnection != nil && m.ConnInputs[0].Value() != "" && m.ConnInputs[1].Value() != "" {

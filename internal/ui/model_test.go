@@ -131,6 +131,7 @@ func TestModel_ResetConnInputs(t *testing.T) {
 	m.ConnInputs[7].SetValue("credentials.redis.password")
 	m.ConnInputs[8].SetValue("5")
 	m.ConnFocusIdx = 3
+	m.ConnUseVault = true
 
 	// Reset
 	m.resetConnInputs()
@@ -159,6 +160,9 @@ func TestModel_ResetConnInputs(t *testing.T) {
 	}
 	if m.ConnFocusIdx != 0 {
 		t.Errorf("ConnFocusIdx = %d, want 0", m.ConnFocusIdx)
+	}
+	if m.ConnUseVault {
+		t.Error("ConnUseVault should be reset to false")
 	}
 }
 
@@ -231,6 +235,14 @@ func TestModel_PopulateConnInputs(t *testing.T) {
 	if m.ConnInputs[8].Value() != "2" {
 		t.Errorf("DB = %q, want \"2\"", m.ConnInputs[8].Value())
 	}
+	if !m.ConnUseVault {
+		t.Error("ConnUseVault should be on when the connection has vault fields")
+	}
+
+	m.populateConnInputs(types.Connection{Name: "plain", Host: "localhost", Port: 6379})
+	if m.ConnUseVault {
+		t.Error("ConnUseVault should be off when the connection has no vault fields")
+	}
 }
 
 func TestModel_ConvertCurrentInputsToConnection_Add(t *testing.T) {
@@ -247,6 +259,7 @@ func TestModel_ConvertCurrentInputsToConnection_Add(t *testing.T) {
 	m.ConnInputs[7].SetValue("credentials.redis.password")
 	m.ConnInputs[8].SetValue("5")
 	m.ConnClusterMode = true
+	m.ConnUseVault = true
 	m.ConnFocusIdx = 3
 
 	// Convert
@@ -293,6 +306,7 @@ func TestModel_ConvertCurrentInputsToConnection_Edit(t *testing.T) {
 	m.ConnInputs[7].SetValue("credentials.redis.password")
 	m.ConnInputs[8].SetValue("5")
 	m.ConnClusterMode = true
+	m.ConnUseVault = true
 	m.ConnFocusIdx = 3
 
 	// Convert
@@ -324,6 +338,23 @@ func TestModel_ConvertCurrentInputsToConnection_Edit(t *testing.T) {
 	}
 	if conn.ID != 1 {
 		t.Errorf("ID = %d, want %d", conn.ID, 1)
+	}
+}
+
+func TestModel_ConvertCurrentInputsToConnection_VaultDisabled(t *testing.T) {
+	m := NewModel()
+
+	m.ConnInputs[0].SetValue("My Connection")
+	m.ConnInputs[1].SetValue("redis.example.com")
+	m.ConnInputs[5].SetValue("secret/data/redis")
+	m.ConnInputs[6].SetValue("credentials.redis.username")
+	m.ConnInputs[7].SetValue("credentials.redis.password")
+	m.ConnUseVault = false
+
+	conn := m.convertCurrentInputsToConnection(m.ConnInputs, "add")
+
+	if conn.VaultPath != "" || conn.VaultUserKey != "" || conn.VaultPasswordKey != "" {
+		t.Errorf("Vault reference should be blank when vault is off, got %q/%q/%q", conn.VaultPath, conn.VaultUserKey, conn.VaultPasswordKey)
 	}
 }
 

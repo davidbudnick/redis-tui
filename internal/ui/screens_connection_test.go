@@ -130,13 +130,13 @@ func TestHandleAddConnectionScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		result, _ := m.handleAddConnectionScreen(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
 		model := result.(Model)
-		if model.ConnFocusIdx != 9 {
-			t.Errorf("expected ConnFocusIdx=9, got %d", model.ConnFocusIdx)
+		if model.ConnFocusIdx != 7 {
+			t.Errorf("expected ConnFocusIdx=7, got %d", model.ConnFocusIdx)
 		}
 	})
 	t.Run("space on cluster toggle", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		m.ConnFocusIdx = 8
+		m.ConnFocusIdx = 6
 		result, _ := m.handleAddConnectionScreen(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
 		model := result.(Model)
 		if !model.ConnClusterMode {
@@ -145,10 +145,29 @@ func TestHandleAddConnectionScreen(t *testing.T) {
 	})
 	t.Run("space on cluster toggle adjusts focus", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		m.ConnFocusIdx = 8
+		m.ConnFocusIdx = 6
 		m.ConnClusterMode = false
 		// Force an out-of-range focus scenario by pre-setting then toggling
 		_, _ = m.handleAddConnectionScreen(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
+	})
+	t.Run("space on vault toggle", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.ConnFocusIdx = connVaultToggleIdx
+		result, _ := m.handleAddConnectionScreen(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
+		model := result.(Model)
+		if !model.ConnUseVault {
+			t.Error("expected vault mode on")
+		}
+	})
+	t.Run("space on cluster toggle with vault on", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.ConnUseVault = true
+		m.ConnFocusIdx = 9
+		result, _ := m.handleAddConnectionScreen(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
+		model := result.(Model)
+		if !model.ConnClusterMode {
+			t.Error("expected cluster mode on")
+		}
 	})
 	t.Run("space on text field sends to input", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
@@ -156,11 +175,20 @@ func TestHandleAddConnectionScreen(t *testing.T) {
 	})
 	t.Run("enter on cluster toggle", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		m.ConnFocusIdx = 8
+		m.ConnFocusIdx = 6
 		result, _ := m.handleAddConnectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		model := result.(Model)
 		if !model.ConnClusterMode {
 			t.Error("expected cluster toggled")
+		}
+	})
+	t.Run("enter on vault toggle", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.ConnFocusIdx = connVaultToggleIdx
+		result, _ := m.handleAddConnectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
+		model := result.(Model)
+		if !model.ConnUseVault {
+			t.Error("expected vault toggled")
 		}
 	})
 	t.Run("enter submits when valid", func(t *testing.T) {
@@ -213,17 +241,26 @@ func TestHandleEditConnectionScreen(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		result, _ := m.handleEditConnectionScreen(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
 		model := result.(Model)
-		if model.ConnFocusIdx != 9 {
-			t.Errorf("expected ConnFocusIdx=9, got %d", model.ConnFocusIdx)
+		if model.ConnFocusIdx != 7 {
+			t.Errorf("expected ConnFocusIdx=7, got %d", model.ConnFocusIdx)
 		}
 	})
 	t.Run("space on cluster", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		m.ConnFocusIdx = 8
+		m.ConnFocusIdx = 6
 		result, _ := m.handleEditConnectionScreen(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
 		model := result.(Model)
 		if !model.ConnClusterMode {
 			t.Error("expected cluster on")
+		}
+	})
+	t.Run("space on vault", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.ConnFocusIdx = connVaultToggleIdx
+		result, _ := m.handleEditConnectionScreen(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
+		model := result.(Model)
+		if !model.ConnUseVault {
+			t.Error("expected vault on")
 		}
 	})
 	t.Run("space on text", func(t *testing.T) {
@@ -232,11 +269,20 @@ func TestHandleEditConnectionScreen(t *testing.T) {
 	})
 	t.Run("enter on cluster toggle", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		m.ConnFocusIdx = 8
+		m.ConnFocusIdx = 6
 		result, _ := m.handleEditConnectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
 		model := result.(Model)
 		if !model.ConnClusterMode {
 			t.Error("expected cluster toggled")
+		}
+	})
+	t.Run("enter on vault toggle", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.ConnFocusIdx = connVaultToggleIdx
+		result, _ := m.handleEditConnectionScreen(tea.KeyPressMsg{Code: tea.KeyEnter})
+		model := result.(Model)
+		if !model.ConnUseVault {
+			t.Error("expected vault toggled")
 		}
 	})
 	t.Run("enter submits when valid", func(t *testing.T) {
@@ -295,23 +341,30 @@ func TestHandleTestConnectionScreen(t *testing.T) {
 
 func TestConnInputIndex(t *testing.T) {
 	tests := []struct {
+		useVault bool
 		focus    int
 		expected int
 	}{
-		{0, 0},
-		{1, 1},
-		{2, 2},
-		{3, 3},
-		{4, 4},
-		{5, 5},
-		{6, 6},
-		{7, 7},
-		{8, -1}, // cluster toggle
-		{9, 8},  // DB maps to input 8
+		{false, 0, 0},
+		{false, 1, 1},
+		{false, 2, 2},
+		{false, 3, 3},
+		{false, 4, 4},
+		{false, 5, -1}, // vault toggle
+		{false, 6, -1}, // cluster toggle
+		{false, 7, 8},  // DB maps to input 8
+		{true, 4, 4},
+		{true, 5, -1}, // vault toggle
+		{true, 6, 5},  // vault path
+		{true, 7, 6},  // vault username key
+		{true, 8, 7},  // vault password key
+		{true, 9, -1}, // cluster toggle
+		{true, 10, 8}, // DB maps to input 8
 	}
 	for _, tt := range tests {
-		if got := connInputIndex(tt.focus); got != tt.expected {
-			t.Errorf("connInputIndex(%d) = %d, want %d", tt.focus, got, tt.expected)
+		m := Model{ConnUseVault: tt.useVault}
+		if got := m.connInputIndex(tt.focus); got != tt.expected {
+			t.Errorf("connInputIndex(%d) with vault=%v = %d, want %d", tt.focus, tt.useVault, got, tt.expected)
 		}
 	}
 }

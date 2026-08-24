@@ -109,6 +109,7 @@ type Model struct {
 	ClusterEnabled  bool
 	SelectedNodeIdx int
 	ConnClusterMode bool
+	ConnUseVault    bool
 
 	// Compare keys
 	CompareResult   *types.KeyComparison
@@ -405,6 +406,7 @@ func (m *Model) resetConnInputs() {
 	m.ConnInputs[0].Focus()
 	m.ConnFocusIdx = 0
 	m.ConnClusterMode = false
+	m.ConnUseVault = false
 }
 
 func (m *Model) resetAddKeyInputs() {
@@ -430,6 +432,7 @@ func (m *Model) populateConnInputs(conn types.Connection) {
 	m.ConnInputs[7].SetValue(conn.VaultPasswordKey)
 	m.ConnInputs[8].SetValue(strconv.Itoa(conn.DB))
 	m.ConnClusterMode = conn.UseCluster
+	m.ConnUseVault = conn.VaultPath != "" || conn.VaultUserKey != "" || conn.VaultPasswordKey != ""
 }
 
 // convertCurrentInputsToConnection converts the current inputs to a connection
@@ -441,28 +444,43 @@ func (m *Model) convertCurrentInputsToConnection(inputs []textinput.Model, actio
 
 	port, _ := strconv.Atoi(inputs[2].Value())
 	db, _ := strconv.Atoi(inputs[8].Value())
-	return types.Connection{
-		ID:               id,
-		Name:             inputs[0].Value(),
-		Port:             port,
-		Host:             inputs[1].Value(),
-		Username:         inputs[3].Value(),
-		Password:         inputs[4].Value(),
-		VaultPath:        inputs[5].Value(),
-		VaultUserKey:     inputs[6].Value(),
-		VaultPasswordKey: inputs[7].Value(),
-		DB:               db,
-		UseCluster:       m.ConnClusterMode,
+	conn := types.Connection{
+		ID:         id,
+		Name:       inputs[0].Value(),
+		Port:       port,
+		Host:       inputs[1].Value(),
+		Username:   inputs[3].Value(),
+		Password:   inputs[4].Value(),
+		DB:         db,
+		UseCluster: m.ConnClusterMode,
 	}
+	if m.ConnUseVault {
+		conn.VaultPath = inputs[5].Value()
+		conn.VaultUserKey = inputs[6].Value()
+		conn.VaultPasswordKey = inputs[7].Value()
+	}
+	return conn
 }
 
 // connFieldCount returns the number of focusable fields in the connection form.
-// When cluster mode is on, the DB field is skipped.
+// The vault inputs only count when the vault checkbox is on; the DB field is skipped in cluster mode.
 func (m Model) connFieldCount() int {
-	if m.ConnClusterMode {
+	count := 7
+	if m.ConnUseVault {
+		count += 3
+	}
+	if !m.ConnClusterMode {
+		count++
+	}
+	return count
+}
+
+// connClusterToggleIdx returns the focus index of the cluster checkbox.
+func (m Model) connClusterToggleIdx() int {
+	if m.ConnUseVault {
 		return 9
 	}
-	return 10
+	return 6
 }
 
 func (m *Model) resetAddCollectionInputs() {
