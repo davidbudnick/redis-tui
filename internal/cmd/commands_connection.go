@@ -70,7 +70,7 @@ func (c *Commands) Connect(conn types.Connection) tea.Cmd {
 			err = c.redis.Connect(conn)
 		}
 		if err != nil {
-			slog.Error("Failed to connect", "error", err)
+			slog.Error("Failed to connect")
 		}
 		return types.ConnectedMsg{Err: err}
 	}
