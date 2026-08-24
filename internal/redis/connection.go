@@ -304,5 +304,10 @@ func (c *Client) TestConnection(conn types.Connection) (time.Duration, error) {
 	defer cancel()
 
 	_, err = testClient.Ping(ctx).Result()
-	return time.Since(start), err
+	return elapsedSince(start), err
+}
+
+// elapsedSince returns time since start, floored at 1ns for coarse Windows clocks.
+func elapsedSince(start time.Time) time.Duration {
+	return max(time.Since(start), time.Nanosecond)
 }
