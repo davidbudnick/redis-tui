@@ -89,9 +89,23 @@ func TestViewEditConnection(t *testing.T) {
 }
 
 func TestRenderConnForm(t *testing.T) {
-	t.Run("default", func(t *testing.T) {
+	t.Run("default hides vault fields", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
-		assertNonEmpty(t, "form", m.renderConnForm())
+		out := m.renderConnForm()
+		assertNonEmpty(t, "form", out)
+		if strings.Contains(out, "Vault Path:") {
+			t.Error("expected vault fields hidden when checkbox is off")
+		}
+	})
+	t.Run("vault checkbox shows vault fields", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.ConnUseVault = true
+		out := m.renderConnForm()
+		for _, label := range []string{"Vault Path:", "Vault Username Key:", "Vault Password Key:"} {
+			if !strings.Contains(out, label) {
+				t.Errorf("expected %q shown when vault checkbox is on", label)
+			}
+		}
 	})
 	t.Run("cluster mode hides db", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
@@ -102,8 +116,16 @@ func TestRenderConnForm(t *testing.T) {
 		}
 	})
 	t.Run("focus on each field", func(t *testing.T) {
-		for i := 0; i <= 9; i++ {
+		for i := 0; i <= 7; i++ {
 			m, _, _ := newTestModel(t)
+			m.ConnFocusIdx = i
+			assertNonEmpty(t, "focus", m.renderConnForm())
+		}
+	})
+	t.Run("focus on each field with vault on", func(t *testing.T) {
+		for i := 0; i <= 10; i++ {
+			m, _, _ := newTestModel(t)
+			m.ConnUseVault = true
 			m.ConnFocusIdx = i
 			assertNonEmpty(t, "focus", m.renderConnForm())
 		}

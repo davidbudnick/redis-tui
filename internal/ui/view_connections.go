@@ -307,48 +307,59 @@ func (m Model) viewEditConnection() string {
 func (m Model) renderConnForm() string {
 	var b strings.Builder
 
-	// Fields 0-7: connection and credential inputs.
-	textLabels := []string{"Name", "Host", "Port", "Username", "Password", "Vault Path", "Vault Username Key", "Vault Password Key"}
+	textLabels := []string{"Name", "Host", "Port", "Username", "Password"}
 	for i := range textLabels {
-		labelStyle := keyStyle
-		if m.ConnFocusIdx == i {
-			labelStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
-		}
-		b.WriteString(labelStyle.Render(textLabels[i] + ":"))
-		b.WriteString("\n")
-		b.WriteString(m.ConnInputs[i].View())
-		b.WriteString("\n\n")
+		b.WriteString(m.renderConnInput(textLabels[i], i))
 	}
 
-	// Field 8: Cluster toggle
-	clusterLabelStyle := keyStyle
-	if m.ConnFocusIdx == len(textLabels) {
-		clusterLabelStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
+	b.WriteString(m.renderConnCheckbox("Vault", "Use Vault", m.ConnUseVault, connVaultToggleIdx))
+
+	if m.ConnUseVault {
+		vaultLabels := []string{"Vault Path", "Vault Username Key", "Vault Password Key"}
+		for i := range vaultLabels {
+			b.WriteString(m.renderConnInput(vaultLabels[i], connVaultToggleIdx+1+i))
+		}
 	}
-	b.WriteString(clusterLabelStyle.Render("Cluster:"))
+
+	b.WriteString(m.renderConnCheckbox("Cluster", "Cluster Mode", m.ConnClusterMode, m.connClusterToggleIdx()))
+
+	if !m.ConnClusterMode {
+		b.WriteString(m.renderConnInput("Database", m.connClusterToggleIdx()+1))
+	}
+
+	return b.String()
+}
+
+// renderConnInput renders a labeled text input, highlighted when focused.
+func (m Model) renderConnInput(label string, focusIdx int) string {
+	var b strings.Builder
+	labelStyle := keyStyle
+	if m.ConnFocusIdx == focusIdx {
+		labelStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
+	}
+	b.WriteString(labelStyle.Render(label + ":"))
 	b.WriteString("\n")
-	checkbox := "[ ] Cluster Mode"
-	if m.ConnClusterMode {
-		checkbox = "[x] Cluster Mode"
-	}
+	b.WriteString(m.ConnInputs[m.connInputIndex(focusIdx)].View())
+	b.WriteString("\n\n")
+	return b.String()
+}
+
+// renderConnCheckbox renders a labeled checkbox, highlighted when focused.
+func (m Model) renderConnCheckbox(label, name string, checked bool, focusIdx int) string {
+	var b strings.Builder
+	labelStyle := keyStyle
 	checkboxStyle := normalStyle
-	if m.ConnFocusIdx == len(textLabels) {
+	if m.ConnFocusIdx == focusIdx {
+		labelStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
 		checkboxStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("39"))
 	}
+	checkbox := "[ ] " + name
+	if checked {
+		checkbox = "[x] " + name
+	}
+	b.WriteString(labelStyle.Render(label + ":"))
+	b.WriteString("\n")
 	b.WriteString(checkboxStyle.Render(checkbox))
 	b.WriteString("\n\n")
-
-	// Field 9: Database (only when not in cluster mode)
-	if !m.ConnClusterMode {
-		dbLabelStyle := keyStyle
-		if m.ConnFocusIdx == len(textLabels)+1 {
-			dbLabelStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("39")).Bold(true)
-		}
-		b.WriteString(dbLabelStyle.Render("Database:"))
-		b.WriteString("\n")
-		b.WriteString(m.ConnInputs[8].View())
-		b.WriteString("\n\n")
-	}
-
 	return b.String()
 }
