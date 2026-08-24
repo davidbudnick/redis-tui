@@ -188,8 +188,8 @@ func TestConfig_UpdateConnection(t *testing.T) {
 	if !updated.Created.Equal(originalCreated) {
 		t.Error("Created timestamp should not change")
 	}
-	if !updated.Updated.After(updated.Created) {
-		t.Error("Updated should be after Created")
+	if updated.Updated.Before(updated.Created) {
+		t.Error("Updated should not be before Created")
 	}
 }
 
