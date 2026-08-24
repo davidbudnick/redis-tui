@@ -197,15 +197,15 @@ docker-seed-cluster-stack:
 ## --- Demo ---
 
 ## Render the README demo GIF against an isolated demo config.
-## Built without $(LDFLAGS) so main.version stays "dev" and the update banner is suppressed.
+## Full ldflags build stamped with the latest tag so the update banner stays hidden.
 ## Unset NO_COLOR so lipgloss emits ANSI colors under VHS (agent shells often set NO_COLOR=1).
 demo: docker-up-standalone docker-up-cluster docker-seed-standalone docker-seed-cluster
-	go build -o bin/$(APP_NAME) ./
+	$(MAKE) build VERSION="$(or $(shell git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//'),dev)"
 	env -u NO_COLOR -u FORCE_COLOR COLORTERM=truecolor TERM=xterm-256color CLICOLOR_FORCE=1 FORCE_COLOR=1 vhs docs/demo.tape
 
 ## Capture static README screenshots (docs/main.png, keys-preview.png, protobuf.png, detail.png).
 screenshots: docker-up-standalone docker-seed-standalone
-	go build -o bin/$(APP_NAME) ./
+	$(MAKE) build VERSION="$(or $(shell git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//'),dev)"
 	env -u NO_COLOR -u FORCE_COLOR COLORTERM=truecolor TERM=xterm-256color CLICOLOR_FORCE=1 FORCE_COLOR=1 vhs docs/screenshots.tape
 
 ## Show help
