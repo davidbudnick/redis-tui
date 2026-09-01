@@ -526,10 +526,10 @@ func TestLooksLikeGeoScores(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// isBinaryString — direct unit tests
+// isBitmapCandidate — direct unit tests
 // ---------------------------------------------------------------------------
 
-func TestIsBinaryString(t *testing.T) {
+func TestIsBitmapCandidate(t *testing.T) {
 	tests := []struct {
 		name string
 		s    string
@@ -538,15 +538,16 @@ func TestIsBinaryString(t *testing.T) {
 		{"empty string", "", false},
 		{"valid utf-8 ascii", "hello", false},
 		{"valid utf-8 multibyte", "héllo", false},
+		{"java serialization", javaSerializationHeader + "sr\x00&com.example.Value", false},
 		// Invalid UTF-8 sequence: a single 0xff byte (continuation byte without lead)
 		{"invalid utf-8 single byte", string([]byte{0xff}), true},
 		{"invalid utf-8 mixed", string([]byte{'a', 0xfe, 0xfd}), true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := isBinaryString(tt.s)
+			got := isBitmapCandidate(tt.s)
 			if got != tt.want {
-				t.Errorf("isBinaryString(%q) = %v, want %v", tt.s, got, tt.want)
+				t.Errorf("isBitmapCandidate(%q) = %v, want %v", tt.s, got, tt.want)
 			}
 		})
 	}
@@ -602,6 +603,26 @@ func TestGetValue_Bitmap(t *testing.T) {
 	}
 	if len(v.BitPositions) != 3 {
 		t.Errorf("BitPositions length = %d, want 3", len(v.BitPositions))
+	}
+}
+
+func TestGetValue_JavaSerializationRemainsString(t *testing.T) {
+	client, mr := setupTestClient(t)
+	raw := javaSerializationHeader + "sr\x00&com.garmin.engq.model.AdminSettingsDTO"
+	mr.Set("java", raw)
+
+	v, err := client.GetValue("java")
+	if err != nil {
+		t.Fatalf("GetValue error: %v", err)
+	}
+	if v.Type != types.KeyTypeString {
+		t.Errorf("Type = %q, want %q", v.Type, types.KeyTypeString)
+	}
+	if v.StringValue != raw {
+		t.Errorf("StringValue = %q, want original serialized value", v.StringValue)
+	}
+	if v.BitCount != 0 || len(v.BitPositions) != 0 {
+		t.Errorf("unexpected bitmap metadata: count=%d positions=%v", v.BitCount, v.BitPositions)
 	}
 }
 
@@ -1083,10 +1104,10 @@ func TestBulkDelete_LargeKeySet(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// isBinaryPrefix — direct unit tests
+// isBitmapCandidatePrefix — direct unit tests
 // ---------------------------------------------------------------------------
 
-func TestIsBinaryPrefix(t *testing.T) {
+func TestIsBitmapCandidatePrefix(t *testing.T) {
 	tests := []struct {
 		name string
 		s    string
@@ -1095,6 +1116,7 @@ func TestIsBinaryPrefix(t *testing.T) {
 		{"empty string", "", false},
 		{"valid utf-8 ascii", "hello", false},
 		{"valid utf-8 multibyte", "héllo", false},
+		{"java serialization", javaSerializationHeader + "sr\x00&com.example.Value", false},
 		// A 3-byte rune (é = 0xE4 0xB8 0xAD is 中) cut after 1 byte: not binary.
 		{"split rune one byte left", "hello\xe4", false},
 		// Cut after 2 of 3 bytes: not binary.
@@ -1107,9 +1129,9 @@ func TestIsBinaryPrefix(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := isBinaryPrefix(tt.s)
+			got := isBitmapCandidatePrefix(tt.s)
 			if got != tt.want {
-				t.Errorf("isBinaryPrefix(%q) = %v, want %v", tt.s, got, tt.want)
+				t.Errorf("isBitmapCandidatePrefix(%q) = %v, want %v", tt.s, got, tt.want)
 			}
 		})
 	}
@@ -1152,13 +1174,13 @@ func TestExtractBitPositions(t *testing.T) {
 	})
 }
 
-func TestIsBinaryPrefixAndExtractMaxZero(t *testing.T) {
+func TestIsBitmapCandidatePrefixAndExtractMaxZero(t *testing.T) {
 	// incomplete multi-byte rune at end of prefix should not mark binary
-	if isBinaryPrefix("hello\xc2") {
+	if isBitmapCandidatePrefix("hello\xc2") {
 		t.Error("incomplete UTF-8 trail should not be binary")
 	}
 	// More than utf8.UTFMax-1 invalid trailing bytes remain after prefix trim.
-	if !isBinaryPrefix(string([]byte{0xff, 0xfe, 0xfd, 0xfc})) {
+	if !isBitmapCandidatePrefix(string([]byte{0xff, 0xfe, 0xfd, 0xfc})) {
 		t.Error("invalid bytes should be binary")
 	}
 	if extractBitPositions([]byte{0xff}, 0) != nil {

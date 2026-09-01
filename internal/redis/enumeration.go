@@ -524,9 +524,9 @@ func (c *Client) detectStringSubtypes(keys []types.RedisKey) []types.RedisKey {
 			continue
 		}
 		// A full-size probe may split a multi-byte UTF-8 rune at the cut point.
-		binary := isBinaryString(val)
+		binary := isBitmapCandidate(val)
 		if len(val) == subtypeProbeBytes {
-			binary = isBinaryPrefix(val)
+			binary = isBitmapCandidatePrefix(val)
 		}
 		if !binary {
 			continue
@@ -579,7 +579,7 @@ func (c *Client) detectStringSubtypes(keys []types.RedisKey) []types.RedisKey {
 			keys[idx].Type = types.KeyTypeProtobuf
 			continue
 		}
-		if isBinaryString(val) {
+		if isBitmapCandidate(val) {
 			keys[idx].Type = types.KeyTypeBitmap
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"charm.land/lipgloss/v2"
 	"github.com/davidbudnick/redis-tui/internal/types"
@@ -114,9 +115,33 @@ func sanitizeBinaryString(s string) (string, bool) {
 		}
 	}
 
-	// If more than 10% non-printable, treat as binary
-	if len(s) > 0 && float64(nonPrintable)/float64(len(s)) > 0.1 {
-		return fmt.Sprintf("(binary data, %d bytes)", len(s)), true
+	// Invalid UTF-8 or a high control-character ratio indicates binary data.
+	if len(s) > 0 && (!utf8.ValidString(s) || float64(nonPrintable)/float64(len(s)) > 0.1) {
+		const excerptBytes = 96
+		limit := min(len(s), excerptBytes)
+		var excerpt strings.Builder
+		for _, b := range []byte(s[:limit]) {
+			if b >= 0x20 && b <= 0x7e && b != '\\' {
+				excerpt.WriteByte(b)
+				continue
+			}
+			switch b {
+			case '\n':
+				excerpt.WriteString(`\n`)
+			case '\r':
+				excerpt.WriteString(`\r`)
+			case '\t':
+				excerpt.WriteString(`\t`)
+			case '\\':
+				excerpt.WriteString(`\\`)
+			default:
+				fmt.Fprintf(&excerpt, "\\x%02x", b)
+			}
+		}
+		if limit < len(s) {
+			excerpt.WriteString("...")
+		}
+		return fmt.Sprintf("(binary data, %d bytes)\nPreview: %s", len(s), excerpt.String()), true
 	}
 
 	// Replace any remaining problematic characters
@@ -166,7 +191,6 @@ var (
 	jsonNullStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("90")) // Gray for null
 	jsonBracketStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("15")) // White for brackets
 )
-
 
 // Aliases used by protobuf highlighting and other callers.
 var (

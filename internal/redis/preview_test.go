@@ -103,6 +103,26 @@ func TestGetValuePreview_Bitmap(t *testing.T) {
 	}
 }
 
+func TestGetValuePreview_JavaSerializationRemainsString(t *testing.T) {
+	client, mr := setupTestClient(t)
+	raw := javaSerializationHeader + "t\x00\x0fcactus-tech.com"
+	mr.Set("java", raw)
+
+	v, err := client.GetValuePreview("java")
+	if err != nil {
+		t.Fatalf("GetValuePreview error: %v", err)
+	}
+	if v.Type != types.KeyTypeString {
+		t.Errorf("Type = %q, want %q", v.Type, types.KeyTypeString)
+	}
+	if v.StringValue != raw {
+		t.Errorf("StringValue = %q, want original serialized value", v.StringValue)
+	}
+	if v.BitCount != 0 || len(v.BitPositions) != 0 {
+		t.Errorf("unexpected bitmap metadata: count=%d positions=%v", v.BitCount, v.BitPositions)
+	}
+}
+
 func TestGetValuePreview_BitmapTruncated(t *testing.T) {
 	client, mr := setupTestClient(t)
 	// Binary value larger than the preview byte cap. Incomplete binary must
