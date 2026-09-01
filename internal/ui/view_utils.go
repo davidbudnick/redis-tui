@@ -161,6 +161,11 @@ func sanitizeBinaryString(s string) (string, bool) {
 	return result.String(), false
 }
 
+// stringValueEditable reports whether a Redis string is safe to open in the text editor.
+func stringValueEditable(s string) bool {
+	return utf8.ValidString(s)
+}
+
 func formatPossibleJSON(s string) string {
 	s = strings.TrimSpace(s)
 	if len(s) == 0 {

@@ -425,6 +425,31 @@ func TestViewKeyDetail(t *testing.T) {
 			t.Error("expected no key message")
 		}
 	})
+	t.Run("text string includes edit help", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.Width = 120
+		m.Height = 40
+		m.CurrentKey = &types.RedisKey{Key: "s", Type: types.KeyTypeString}
+		m.CurrentValue = types.RedisValue{Type: types.KeyTypeString, StringValue: "hello"}
+		out := m.viewKeyDetail()
+		if !strings.Contains(out, "e:edit") {
+			t.Error("text string help should include e:edit")
+		}
+	})
+	t.Run("binary string omits edit help", func(t *testing.T) {
+		m, _, _ := newTestModel(t)
+		m.Width = 120
+		m.Height = 40
+		m.CurrentKey = &types.RedisKey{Key: "java", Type: types.KeyTypeString}
+		m.CurrentValue = types.RedisValue{
+			Type:        types.KeyTypeString,
+			StringValue: "\xac\xed\x00\x05sr\x00&com.example.Value",
+		}
+		out := m.viewKeyDetail()
+		if strings.Contains(out, "e:edit") {
+			t.Error("binary string help should omit e:edit")
+		}
+	})
 	t.Run("ttl short", func(t *testing.T) {
 		m, _, _ := newTestModel(t)
 		m.CurrentKey = &types.RedisKey{Key: "foo", Type: types.KeyTypeString, TTL: 5 * time.Second}
