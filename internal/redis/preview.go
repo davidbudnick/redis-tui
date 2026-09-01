@@ -116,9 +116,9 @@ func (c *Client) fetchString(key string, value *types.RedisValue, maxBytes int64
 		return nil
 	}
 
-	binary := isBinaryString(val)
+	binary := isBitmapCandidate(val)
 	if value.Truncated {
-		binary = isBinaryPrefix(val)
+		binary = isBitmapCandidatePrefix(val)
 		if binary && deferTruncatedBinary {
 			return nil
 		}

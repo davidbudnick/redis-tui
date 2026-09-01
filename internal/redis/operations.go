@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -8,10 +9,14 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// maxBitPositions caps how many set-bit positions are extracted from a bitmap
-// value — the UI displays only a screenful, and an unbounded extraction of a
-// large bitmap could allocate millions of entries.
-const maxBitPositions = 1024
+const (
+	// maxBitPositions caps how many set-bit positions are extracted from a bitmap
+	// value — the UI displays only a screenful, and an unbounded extraction of a
+	// large bitmap could allocate millions of entries.
+	maxBitPositions = 1024
+
+	javaSerializationHeader = "\xac\xed\x00\x05"
+)
 
 // GetValue retrieves a bounded detail value for a key (never unbounded dumps).
 func (c *Client) GetValue(key string) (types.RedisValue, error) {
@@ -34,10 +39,13 @@ func looksLikeGeoScores(members []types.ZSetMember) bool {
 	return true
 }
 
-// isBinaryString returns true if the string contains binary data (invalid
-// UTF-8 or null bytes), suggesting it was created via SETBIT as a bitmap.
-func isBinaryString(s string) bool {
+// isBitmapCandidate returns true for invalid UTF-8 that may have been created
+// via SETBIT. Known binary serialization formats remain Redis strings.
+func isBitmapCandidate(s string) bool {
 	if len(s) == 0 {
+		return false
+	}
+	if strings.HasPrefix(s, javaSerializationHeader) {
 		return false
 	}
 	return !utf8.ValidString(s)
@@ -63,11 +71,11 @@ func extractBitPositions(val []byte, max int) []int64 {
 	return positions
 }
 
-// isBinaryPrefix is like isBinaryString but for a value prefix (e.g. from
+// isBitmapCandidatePrefix is like isBitmapCandidate but for a value prefix (e.g. from
 // GETRANGE): a multi-byte UTF-8 rune split at the cut point must not count as
 // binary, so up to utf8.UTFMax-1 trailing bytes of an incomplete rune are
 // trimmed before validating.
-func isBinaryPrefix(s string) bool {
+func isBitmapCandidatePrefix(s string) bool {
 	for i := 0; i < utf8.UTFMax-1 && len(s) > 0; i++ {
 		if utf8.ValidString(s) {
 			return false
@@ -78,7 +86,7 @@ func isBinaryPrefix(s string) bool {
 		}
 		s = s[:len(s)-1]
 	}
-	return isBinaryString(s)
+	return isBitmapCandidate(s)
 }
 
 // JSONGet retrieves a JSON value from a RedisJSON key

@@ -826,6 +826,25 @@ func TestScanKeys_DetectStringSubtypes_Bitmap(t *testing.T) {
 	}
 }
 
+func TestScanKeys_JavaSerializationRemainsString(t *testing.T) {
+	client, mr := setupTestClient(t)
+	mr.Set("java:short", javaSerializationHeader+"t\x00\x0fcactus-tech.com")
+	mr.Set("java:long", javaSerializationHeader+strings.Repeat("\xff", subtypeProbeBytes*2))
+
+	keys, _, err := client.ScanKeys("java:*", 0, 100)
+	if err != nil {
+		t.Fatalf("ScanKeys error: %v", err)
+	}
+	if len(keys) != 2 {
+		t.Fatalf("expected 2 keys, got %d", len(keys))
+	}
+	for _, key := range keys {
+		if key.Type != types.KeyTypeString {
+			t.Errorf("%s type = %q, want %q", key.Key, key.Type, types.KeyTypeString)
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------
 // detectStringSubtypes — GetRange error path on a single string key. We use
 // the fake server to return one key from SCAN, "string" type, then have

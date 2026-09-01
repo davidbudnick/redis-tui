@@ -44,6 +44,7 @@ func TestSanitizeBinaryString(t *testing.T) {
 		{"HyperLogLog prefix", "HYLL\x00\x01\x02data", true, "HyperLogLog"},
 		{"tabs and newlines preserved", "line1\nline2\ttab", false, "line1\nline2\ttab"},
 		{"high non-printable ratio", string([]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x10, 0x11}), true, "binary data"},
+		{"java serialization excerpt", "\xac\xed\x00\x05sr\x00&com.garmin.engq.model.AdminSettingsDTO", true, `Preview: \xac\xed\x00\x05sr\x00&com.garmin`},
 		{"low non-printable below threshold", "abcdefghijklmnopqrst\x01", false, "\\x01"},
 		{"low non-printable above threshold", "abc\x01def", true, "binary data"},
 	}
@@ -58,6 +59,23 @@ func TestSanitizeBinaryString(t *testing.T) {
 				t.Errorf("sanitizeBinaryString(%q) = %q, want to contain %q", tt.input, result, tt.checkContains)
 			}
 		})
+	}
+}
+
+func TestSanitizeBinaryStringExcerpt(t *testing.T) {
+	input := "\xac\xed\x00\x05\x1b[31m\\\n\r\t" + strings.Repeat("a", 100)
+	result, isBinary := sanitizeBinaryString(input)
+	if !isBinary {
+		t.Fatal("expected binary data")
+	}
+	if !strings.Contains(result, "(binary data, 113 bytes)\nPreview: \\xac\\xed\\x00\\x05\\x1b[31m\\\\\\n\\r\\t") {
+		t.Errorf("unexpected binary summary: %q", result)
+	}
+	if !strings.HasSuffix(result, "...") {
+		t.Errorf("expected truncated excerpt, got %q", result)
+	}
+	if strings.ContainsRune(result, '\x1b') {
+		t.Errorf("result contains a terminal escape byte: %q", result)
 	}
 }
 
