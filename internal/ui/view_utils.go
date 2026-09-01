@@ -106,7 +106,9 @@ func sanitizeBinaryString(s string) (string, bool) {
 
 	// Count non-printable characters
 	nonPrintable := 0
+	runeCount := 0
 	for _, r := range s {
+		runeCount++
 		if r < 32 && r != '\n' && r != '\r' && r != '\t' {
 			nonPrintable++
 		}
@@ -116,7 +118,7 @@ func sanitizeBinaryString(s string) (string, bool) {
 	}
 
 	// Invalid UTF-8 or a high control-character ratio indicates binary data.
-	if len(s) > 0 && (!utf8.ValidString(s) || float64(nonPrintable)/float64(len(s)) > 0.1) {
+	if runeCount > 0 && (!utf8.ValidString(s) || float64(nonPrintable)/float64(runeCount) > 0.1) {
 		const excerptBytes = 96
 		limit := min(len(s), excerptBytes)
 		var excerpt strings.Builder
