@@ -112,8 +112,12 @@ func (m Model) viewKeyDetail() string {
 
 	helpText := "j/k:move  t:TTL  d:del  r:refresh  R:rename  c:copy"
 	switch m.CurrentKey.Type {
-	case types.KeyTypeString, types.KeyTypeJSON:
+	case types.KeyTypeJSON:
 		helpText += "  e:edit"
+	case types.KeyTypeString:
+		if stringValueEditable(m.CurrentValue.StringValue) {
+			helpText += "  e:edit"
+		}
 	case types.KeyTypeHyperLogLog, types.KeyTypeBitmap:
 		helpText += "  a:add"
 	case types.KeyTypeProtobuf:

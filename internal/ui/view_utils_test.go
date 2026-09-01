@@ -80,6 +80,21 @@ func TestSanitizeBinaryStringExcerpt(t *testing.T) {
 	}
 }
 
+func TestStringValueEditable(t *testing.T) {
+	if !stringValueEditable("hello") {
+		t.Error("valid utf-8 should be editable")
+	}
+	if !stringValueEditable("") {
+		t.Error("empty string should be editable")
+	}
+	if stringValueEditable("\xac\xed\x00\x05sr\x00&com.example.Value") {
+		t.Error("java serialization should not be editable")
+	}
+	if stringValueEditable(string([]byte{0xff})) {
+		t.Error("invalid utf-8 should not be editable")
+	}
+}
+
 func TestTruncate(t *testing.T) {
 	tests := []struct {
 		name     string

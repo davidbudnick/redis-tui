@@ -315,6 +315,10 @@ func (m Model) handleKeyDetailScreen(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "e":
 		if m.CurrentKey != nil && (m.CurrentKey.Type == types.KeyTypeString || m.CurrentKey.Type == types.KeyTypeJSON) {
 			content := m.CurrentValue.StringValue
+			if m.CurrentKey.Type == types.KeyTypeString && !stringValueEditable(content) {
+				m.StatusMsg = "Cannot edit binary string values"
+				return m, nil
+			}
 			fileName := ""
 			if m.CurrentKey.Type == types.KeyTypeJSON {
 				content = m.CurrentValue.JSONValue

@@ -748,6 +748,24 @@ func TestHandleKeyDetailScreen(t *testing.T) {
 			t.Errorf("expected ScreenEditValue, got %v", model.Screen)
 		}
 	})
+	t.Run("e edit binary string refused", func(t *testing.T) {
+		m, _ := newModelWithKey(t, types.KeyTypeString)
+		m.CurrentValue.StringValue = "\xac\xed\x00\x05sr\x00&com.example.Value"
+		result, cmd := m.handleKeyDetailScreen(keyMsg('e'))
+		model := result.(Model)
+		if model.Screen == types.ScreenEditValue {
+			t.Error("binary string should not open editor")
+		}
+		if model.VimEditor != nil {
+			t.Error("expected no editor")
+		}
+		if cmd != nil {
+			t.Error("expected no cmd")
+		}
+		if !strings.Contains(model.StatusMsg, "binary") {
+			t.Errorf("StatusMsg = %q, want binary refusal", model.StatusMsg)
+		}
+	})
 	t.Run("e edit json", func(t *testing.T) {
 		m, _ := newModelWithKey(t, types.KeyTypeJSON)
 		result, _ := m.handleKeyDetailScreen(keyMsg('e'))
