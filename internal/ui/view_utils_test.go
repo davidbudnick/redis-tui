@@ -47,6 +47,7 @@ func TestSanitizeBinaryString(t *testing.T) {
 		{"java serialization excerpt", "\xac\xed\x00\x05sr\x00&com.garmin.engq.model.AdminSettingsDTO", true, `Preview: \xac\xed\x00\x05sr\x00&com.garmin`},
 		{"low non-printable below threshold", "abcdefghijklmnopqrst\x01", false, "\\x01"},
 		{"low non-printable above threshold", "abc\x01def", true, "binary data"},
+		{"multibyte text uses rune ratio", "界界界界界\x01", true, "binary data"},
 	}
 
 	for _, tt := range tests {
