@@ -8,7 +8,7 @@ require (
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/alicebob/miniredis/v2 v2.38.0
 	github.com/hashicorp/vault/api v1.23.0
-	github.com/klauspost/compress v1.19.2
+	github.com/klauspost/compress v1.20.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/redis/go-redis/v9 v9.22.0
 	google.golang.org/protobuf v1.36.12
