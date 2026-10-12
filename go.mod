@@ -10,7 +10,7 @@ require (
 	github.com/hashicorp/vault/api v1.23.0
 	github.com/klauspost/compress v1.20.0
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/redis/go-redis/v9 v9.22.0
+	github.com/redis/go-redis/v9 v9.23.0
 	google.golang.org/protobuf v1.36.12
 )
 
@@ -45,10 +45,10 @@ require (
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/yuin/gopher-lua v1.1.2 // indirect
-	go.uber.org/atomic v1.11.0 // indirect
+	go.uber.org/atomic v1.12.0 // indirect
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.39.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 )
