@@ -1,6 +1,6 @@
 module github.com/davidbudnick/redis-tui
 
-go 1.26.6
+go 1.26.10
 
 require (
 	charm.land/bubbles/v2 v2.2.1
@@ -46,9 +46,9 @@ require (
 	github.com/xo/terminfo v1.0.0 // indirect
 	github.com/yuin/gopher-lua v1.1.2 // indirect
 	go.uber.org/atomic v1.12.0 // indirect
-	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/text v0.39.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 )
