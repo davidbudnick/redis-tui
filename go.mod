@@ -1,14 +1,14 @@
 module github.com/davidbudnick/redis-tui
 
-go 1.26.10
+go 1.26.11
 
 require (
 	charm.land/bubbles/v2 v2.2.1
 	charm.land/bubbletea/v2 v2.1.1
-	charm.land/lipgloss/v2 v2.0.6
+	charm.land/lipgloss/v2 v2.1.0
 	github.com/alicebob/miniredis/v2 v2.40.0
 	github.com/hashicorp/vault/api v1.23.0
-	github.com/klauspost/compress v1.20.3
+	github.com/klauspost/compress v1.20.4
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/redis/go-redis/v9 v9.23.0
 	google.golang.org/protobuf v1.36.12
