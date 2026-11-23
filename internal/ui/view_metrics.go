@@ -9,16 +9,16 @@ import (
 )
 
 var (
-	metricsHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
+	metricsHeaderStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
 	metricsSectionStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("245"))
-	metricsCardBorder  = lipgloss.NewStyle().
+	metricsCardBorder   = lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
 				BorderForeground(lipgloss.Color("240")).
 				Padding(0, 1).
 				Width(22)
-	metricsCardLabel  = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	metricsCardValue  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
-	metricsGreenValue = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("35"))
+	metricsCardLabel   = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	metricsCardValue   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
+	metricsGreenValue  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("35"))
 	metricsYellowValue = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("33"))
 	metricsChartBorder = lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).

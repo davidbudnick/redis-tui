@@ -37,7 +37,9 @@ func run(addr string, cluster, flush bool) {
 		rdb = redis.NewClient(&redis.Options{Addr: addr})
 	}
 
-	if err := rdb.(interface{ Ping(context.Context) *redis.StatusCmd }).Ping(ctx).Err(); err != nil {
+	if err := rdb.(interface {
+		Ping(context.Context) *redis.StatusCmd
+	}).Ping(ctx).Err(); err != nil {
 		logFatalf("cannot connect to %s: %v", addr, err)
 	}
 	fmt.Printf("Connected to %s\n", addr)

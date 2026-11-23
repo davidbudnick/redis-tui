@@ -22,7 +22,7 @@ import (
 
 // Injectable for tests to simulate crypto failures.
 var (
-	ecdsaGenerateKey     = ecdsa.GenerateKey
+	ecdsaGenerateKey      = ecdsa.GenerateKey
 	x509CreateCertificate = x509.CreateCertificate
 )
 
