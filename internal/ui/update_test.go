@@ -483,4 +483,11 @@ func TestInit(t *testing.T) {
 			t.Error("expected non-nil init cmd")
 		}
 	})
+	t.Run("without commands", func(t *testing.T) {
+		m := NewModel()
+		cmd := m.Init()
+		if cmd == nil {
+			t.Error("expected non-nil init cmd")
+		}
+	})
 }

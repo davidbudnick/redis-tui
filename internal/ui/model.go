@@ -365,6 +365,9 @@ func createPubSubInputs() []textinput.Model {
 }
 
 func (m Model) Init() tea.Cmd {
+	if m.Cmds == nil {
+		return tickCmd()
+	}
 	cmds := []tea.Cmd{
 		m.Cmds.LoadConnections(),
 		m.Cmds.CheckVersion(m.Version),

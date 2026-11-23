@@ -30,12 +30,13 @@ var (
 	osExit   = os.Exit
 	logFatal = prodLogFatal
 	runApp   = prodRunApp
+	teaOpts  []tea.ProgramOption
 )
 
 func prodLogFatal(v ...any) { log.Fatal(v...) }
 
 func prodRunApp(m ui.Model) error {
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(m, teaOpts...)
 	*m.SendFunc = p.Send
 	_, err := p.Run()
 	return err
