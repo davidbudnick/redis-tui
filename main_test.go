@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -854,6 +855,9 @@ func TestProdLogFatal(t *testing.T) {
 }
 
 func TestProdRunApp(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("bubbletea v2.1.2 Run() no longer fails fast without a TTY on Windows")
+	}
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 	orig := teaOpts
