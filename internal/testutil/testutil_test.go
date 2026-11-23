@@ -212,5 +212,5 @@ type fatalTracker struct {
 	failed bool
 }
 
-func (f *fatalTracker) Helper()                          {}
+func (f *fatalTracker) Helper()               {}
 func (f *fatalTracker) Fatalf(string, ...any) { f.failed = true; runtime.Goexit() }

@@ -1188,7 +1188,6 @@ func TestIsBitmapCandidatePrefixAndExtractMaxZero(t *testing.T) {
 	}
 }
 
-
 func TestGetValue_Protobuf(t *testing.T) {
 	client, mr := setupTestClient(t)
 
@@ -1216,7 +1215,6 @@ func TestGetValue_Protobuf(t *testing.T) {
 		t.Errorf("DecodedValue missing field 5:\n%s", v.DecodedValue)
 	}
 }
-
 
 func TestGetValue_Protobuf_S2(t *testing.T) {
 	client, mr := setupTestClient(t)
@@ -1421,8 +1419,6 @@ func TestExtractBitPositions_Caps(t *testing.T) {
 // ---------------------------------------------------------------------------
 // GetValue — Geo branch
 // ---------------------------------------------------------------------------
-
-
 
 // BenchmarkGetValueProtobufS2 measures full decode of a large s2+protobuf menu value.
 func BenchmarkGetValueProtobufS2(b *testing.B) {
