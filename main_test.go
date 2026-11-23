@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -10,13 +11,14 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/davidbudnick/redis-tui/internal/types"
 	"github.com/davidbudnick/redis-tui/internal/ui"
-	"path/filepath"
-	"strings"
-	"testing"
 )
 
 func TestParseFlags_NoArgs(t *testing.T) {
@@ -852,12 +854,15 @@ func TestProdLogFatal(t *testing.T) {
 }
 
 func TestProdRunApp(t *testing.T) {
-	// prodRunApp creates a tea.Program and calls Run(). Without a real
-	// terminal, Run() returns an error. We just need the lines to execute.
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+	orig := teaOpts
+	teaOpts = []tea.ProgramOption{tea.WithContext(ctx)}
+	t.Cleanup(func() { teaOpts = orig })
+
 	m := ui.NewModel()
 	sendFunc := func(tea.Msg) {}
 	m.SendFunc = &sendFunc
-	// Run will fail (no tty) — that's fine, we just need coverage.
 	_ = prodRunApp(m)
 }
 
